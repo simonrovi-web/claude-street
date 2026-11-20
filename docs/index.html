@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Street · Arena</title>
+  <meta name="description" content="Juego de pelea 3D para dos jugadores en el navegador.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="side p1">
+      <div class="name">KAITO</div>
+      <div class="hp"><div class="trail"></div><div class="fill"></div></div>
+      <div class="wins"><i></i><i></i></div>
+    </div>
+    <div id="timer">45</div>
+    <div class="side p2">
+      <div class="name">RINA</div>
+      <div class="hp"><div class="trail"></div><div class="fill"></div></div>
+      <div class="wins"><i></i><i></i></div>
+    </div>
+  </div>
+
+  <div id="announce"></div>
+  <div id="sub"></div>
+  <div id="pop"></div>
+
+  <div id="menu" class="overlay hidden">
+    <div class="panel">
+      <h1>CLAUDE <span>STREET</span></h1>
+      <p class="tag">Torneo de la Arena de Piedra</p>
+      <div class="buttons">
+        <button data-mode="2p" class="primary">2 Jugadores</button>
+        <button data-mode="cpu">1 Jugador vs CPU</button>
+      </div>
+      <div class="controls">
+        <table>
+          <thead><tr><th></th><th class="c1">Jugador 1 · Kaito</th><th class="c2">Jugador 2 · Rina</th></tr></thead>
+          <tbody>
+            <tr><td>Moverse</td><td><kbd>A</kbd> <kbd>D</kbd></td><td><kbd>←</kbd> <kbd>→</kbd></td></tr>
+            <tr><td>Saltar / agacharse</td><td><kbd>W</kbd> <kbd>S</kbd></td><td><kbd>↑</kbd> <kbd>↓</kbd></td></tr>
+            <tr><td>Esquivar (fondo / frente)</td><td><kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>I</kbd> <kbd>O</kbd></td></tr>
+            <tr><td>Puño</td><td><kbd>F</kbd></td><td><kbd>K</kbd></td></tr>
+            <tr><td>Patada</td><td><kbd>G</kbd></td><td><kbd>L</kbd></td></tr>
+            <tr><td>Guardia</td><td><kbd>H</kbd></td><td><kbd>Ñ</kbd></td></tr>
+          </tbody>
+        </table>
+        <ul class="moves">
+          <li><b>Puño, Puño, Patada</b> combo con patada giratoria</li>
+          <li><b>Adelante + Puño</b> codazo (medio)</li>
+          <li><b>Adelante + Patada</b> patada de empuje: ideal para sacar del ring</li>
+          <li><b>Abajo + Patada</b> barrida (bajo, derriba)</li>
+          <li><b>Guardia + Puño</b> de cerca: agarre y lanzamiento por detrás</li>
+          <li><b>Guardia</b> al ser agarrado: escapar del agarre</li>
+        </ul>
+        <p class="hint">Los golpes <b>altos</b> se esquivan agachándose; los <b>bajos</b> se bloquean agachado con guardia. Gana 2 rondas. Saca al rival del ring y ganas la ronda al instante. También funciona con mandos. <kbd>Esc</kbd> pausa.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay hidden">
+    <div class="panel small">
+      <h2>PAUSA</h2>
+      <div class="buttons">
+        <button id="resume" class="primary">Continuar</button>
+        <button class="toMenu">Menú principal</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="end" class="overlay hidden">
+    <div class="panel small">
+      <h2 id="endTitle"></h2>
+      <div class="buttons">
+        <button id="rematch" class="primary">Revancha</button>
+        <button class="toMenu">Menú principal</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading" class="overlay"><p>Cargando arena…</p></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
