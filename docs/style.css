@@ -71,11 +71,11 @@ table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 8px; }
 th.c1 { color: #ffb3a8; } th.c2 { color: #a9c6ff; }
 td { padding: 5px 0; border-top: 1px solid rgba(246,239,230,.08); }
-td:first-child { color: #cbb8a6; }
+td:first-child { color: #e4daf0; }
 kbd { display: inline-block; min-width: 24px; padding: 2px 6px; border-radius: 4px; background: #f6efe6; color: #1a1210; font: 700 12px 'Nunito', sans-serif; text-align: center; box-shadow: 0 2px 0 #8a7a6a; }
 .moves { margin: 16px 0 0; padding-left: 18px; color: #e8dccf; line-height: 1.6; }
 .moves b { color: var(--gold); font-weight: 600; }
-.hint { color: #b9a796; line-height: 1.5; margin: 14px 0 0; }
+.hint { color: #e4daf0; line-height: 1.5; margin: 14px 0 0; }
 
 /* ---------- selección de luchador ---------- */
 #select { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(to bottom, rgba(10,6,5,.55), transparent 22%, transparent 55%, rgba(10,6,5,.85)); }
@@ -222,12 +222,12 @@ html, body { background: #2a1a44; }
 #timer { -webkit-text-stroke: 3px var(--outline); paint-order: stroke fill; color: #fff; text-shadow: 0 4px 0 var(--outline); letter-spacing: 0; }
 #timer.low { color: #ff5a5a; }
 
-#announce { letter-spacing: 2px; background: linear-gradient(180deg, #fff35a 10%, #ff9a1f 90%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 5px var(--outline); paint-order: stroke fill; text-shadow: none; filter: drop-shadow(0 7px 0 rgba(26,15,36,.55)); transform: rotate(-3deg); }
+#announce { letter-spacing: 2px; color: #ffe14a; -webkit-text-stroke: 5px var(--outline); paint-order: stroke fill; text-shadow: none; filter: drop-shadow(0 7px 0 rgba(26,15,36,.55)); transform: rotate(-3deg); }
 #announce.show { animation: slamTilt .4s cubic-bezier(.2,1.6,.4,1); }
 @keyframes slamTilt { from { transform: rotate(-3deg) scale(1.9); opacity: 0; } to { transform: rotate(-3deg) scale(1); opacity: 1; } }
-#announce.fight { background-image: linear-gradient(180deg, #7dffea 10%, #29a8ff 90%); }
-#announce.ko { background-image: linear-gradient(180deg, #ff9ab8 10%, #ff2d4d 90%); }
-#announce.win { background-image: linear-gradient(180deg, #fff35a 10%, #ff5fa8 90%); }
+#announce.fight { color: #6ff0ff; }
+#announce.ko { color: #ff4d6a; }
+#announce.win { color: #ffe14a; }
 #sub, #pop { -webkit-text-stroke: 3px var(--outline); paint-order: stroke fill; color: #ffe14a; letter-spacing: 1px; }
 #pop { color: #7dffea; }
 
@@ -253,8 +253,8 @@ h2 { letter-spacing: 1px; -webkit-text-stroke: 2px var(--outline); paint-order: 
 button { border-radius: 14px; border: 3px solid var(--outline); background: #4a2f7a; color: #fff; box-shadow: 0 5px 0 var(--outline); font-weight: 900; transition: transform .08s, box-shadow .08s, background .15s; }
 button:hover { background: #5b3b92; transform: translateY(-1px); box-shadow: 0 6px 0 var(--outline); }
 button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--outline); }
-button.primary { background: linear-gradient(#ff6a8e, #c81e52); border-color: var(--outline); }
-button.primary:hover { background: linear-gradient(#ff7d9d, #d4265c); }
+button.primary { background: linear-gradient(#d81b5a, #a8124a); border-color: var(--outline); }
+button.primary:hover { background: linear-gradient(#e2235f, #b8164f); }
 button.online { background: linear-gradient(#3fe0ff, #1a8fd8); color: #10203a; border-color: var(--outline); }
 button.ghost, button.ghost-inline { background: #3a2560; border-color: var(--outline); }
 kbd { border: 2px solid var(--outline); box-shadow: 0 2px 0 var(--outline); border-radius: 6px; }
@@ -275,8 +275,8 @@ kbd { border: 2px solid var(--outline); box-shadow: 0 2px 0 var(--outline); bord
 .card em.m1 { background: #c81e52; } .card em.m2 { background: #1f5fd0; }
 
 .tb { border: 3px solid var(--outline); box-shadow: 0 4px 0 var(--outline); }
-.tb.p { background: linear-gradient(#ff6a8e, #c81e52); }
-.tb.k { background: linear-gradient(#4fb0ff, #1f5fd0); }
+.tb.p { background: linear-gradient(#d81b5a, #a8124a); }
+.tb.k { background: linear-gradient(#1f5fd0, #1748a8); }
 .tb.g { background: linear-gradient(#ffd34a, #e0a01a); color: #2a1a10; }
 .tb.sp { background: linear-gradient(#3fe0ff, #1a8fd8); color: #10203a; }
 .tb.side { background: #4a2f7a; }
