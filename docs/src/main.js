@@ -7,7 +7,7 @@ import { Sfx } from './audio.js';
 import { Music, themeFor } from './music.js';
 import { AI, LEVELS } from './ai.js';
 import { Net, cleanCode } from './net.js';
-import { setupEnvironment, loadArena, loadCrowd, updateCrowd, FX, animateSky, animateBanners } from './arena.js';
+import { setupEnvironment, loadArena, loadCrowd, updateCrowd, FX, animateSky, animateBanners, setStage, STAGES, STAGE_KEYS } from './arena.js';
 import { createPost } from './postfx.js';
 import { Trail, Confetti } from './effects.js';
 
@@ -125,6 +125,16 @@ function comic(pos, word) {
 }
 const randWord = () => COMIC[(Math.random() * COMIC.length) | 0];
 
+const comboEls = [document.getElementById('combo1'), document.getElementById('combo2')];
+const comboTimers = [0, 0];
+function showCombo(side, n, dmg) {
+  if (isHost()) outbox.push(['k', side, n, dmg]);
+  const el = comboEls[side];
+  el.innerHTML = `<b>${n}</b> GOLPES<small>${dmg} de daño</small>`;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  comboTimers[side] = 80;
+}
+
 let popTimer = 0;
 const popEl = $('#pop');
 function pop(text, side) {
@@ -136,6 +146,7 @@ function pop(text, side) {
 function tickTexts() {
   if (announceTimer > 0 && --announceTimer === 0) { announceEl.className = ''; subEl.className = ''; }
   if (popTimer > 0 && --popTimer === 0) popEl.className = '';
+  for (let i = 0; i < 2; i++) if (comboTimers[i] > 0 && --comboTimers[i] === 0) comboEls[i].classList.remove('show');
 }
 
 // ---------------------------------------------------------------- estado del juego
@@ -144,6 +155,7 @@ const G = {
   hitstop: 0, slowmo: 0, shake: 0, camN: new THREE.Vector3(0, 0, 1),
   sfx: nsfx, fx: nfx, ai: null, roundWinner: null, crowd: null, projectiles: [], netProj: [],
   finishAvail: false, finisher: null, finishLoser: null, dummy: 'stand', trainIdle: 0,
+  stage: 'atardecer', arcade: null,
   onHit(att, def, A, counter, pos) {
     G.trainIdle = 0;
     if (G.phase === 'finish') { finisherHit(att, def, pos || hitPos(att, A)); return; }
@@ -158,8 +170,9 @@ const G = {
     if (G.crowd) G.crowd.excite = Math.min(1, G.crowd.excite + (heavy ? 0.35 : 0.12));
     if (counter) pop('¡CONTRAATAQUE!', att.index);
     combo[att.index]++;
-    if (combo[att.index] >= 3) pop(`${combo[att.index]} GOLPES`, att.index);
-    combo[def.index] = 0;
+    comboDmg[att.index] += Math.round(A.dmg * att.stats.power * (counter ? 1.25 : 1));
+    if (combo[att.index] >= 2) showCombo(att.index, combo[att.index], comboDmg[att.index]);
+    combo[def.index] = 0; comboDmg[def.index] = 0;
   },
   onBlock(att, def, A, pos) {
     G.trainIdle = 0;
@@ -238,7 +251,7 @@ const G = {
     G.shake = 0.1;
   },
 };
-const combo = [0, 0];
+const combo = [0, 0], comboDmg = [0, 0];
 
 function hitPos(att, A) {
   const f = att.attackFwd || att.fwd();
@@ -252,7 +265,7 @@ function resetRound() {
   G.camN.set(0, 0, 1);
   G.timer = ROUND_TIME * 60;
   G.hitstop = 0; G.slowmo = 0;
-  combo[0] = combo[1] = 0;
+  combo[0] = combo[1] = 0; comboDmg[0] = comboDmg[1] = 0;
   G.projectiles.length = 0;
   G.netProj = [];
   remote.reset();
@@ -262,7 +275,7 @@ function resetRound() {
 function setNames() {
   const you = G.mode === 'online' ? (net.role === 'host' ? 0 : 1) : -1;
   $('.p1 .name').textContent = fighters[0].name + (you === 0 ? ' (TÚ)' : '');
-  $('.p2 .name').textContent = fighters[1].name + (G.mode === 'cpu' ? ' (CPU)' : G.mode === 'training' ? ' (MUÑECO)' : you === 1 ? ' (TÚ)' : '');
+  $('.p2 .name').textContent = fighters[1].name + ((G.mode === 'cpu' || G.mode === 'arcade') ? ' (CPU)' : G.mode === 'training' ? ' (MUÑECO)' : you === 1 ? ' (TÚ)' : '');
 }
 
 function showFightUi() {
@@ -289,12 +302,12 @@ function applyPicks(picks) {
 
 function beginMatch() {
   sfx.init();
-  G.ai = G.mode === 'cpu' ? new AI(cpuLevel) : null;
+  G.ai = G.mode === 'cpu' ? new AI(cpuLevel) : G.mode === 'arcade' ? new AI(ARCADE_LEVELS[G.arcade.idx]) : null;
   applyPicks(sel.cur);
   fighters.forEach((f) => { f.wins = 0; f.meter = 0; });
   G.round = 0;
   showFightUi();
-  if (isHost()) outbox.push(['start', sel.cur.slice()]);
+  if (isHost()) outbox.push(['start', sel.cur.slice(), G.stage]);
   startRound();
 }
 
@@ -379,6 +392,9 @@ function step() {
   fighters[0].update(inputs[0], fighters[1], G);
   fighters[1].update(inputs[1], fighters[0], G);
   updateProjectiles();
+  fighters.forEach((f, i) => {
+    if (['idle', 'walk', 'guard', 'crouch', 'crouchGuard'].includes(f.state)) { combo[1 - i] = 0; comboDmg[1 - i] = 0; }
+  });
 
   // empuje entre cuerpos
   const [a, b] = fighters;
@@ -394,6 +410,73 @@ function step() {
   if (G.crowd) G.crowd.excite = Math.max(0.15, G.crowd.excite - 0.004);
   sendSnapshot();
 }
+
+// ---------------------------------------------------------------- escenarios
+function applyStage(key) {
+  G.stage = STAGES[key] ? key : 'atardecer';
+  setStage(env, arena, scene, renderer, G.stage);
+  updateStageLabel();
+}
+function cycleStage(d) {
+  const i = STAGE_KEYS.indexOf(G.stage);
+  applyStage(STAGE_KEYS[(i + d + STAGE_KEYS.length) % STAGE_KEYS.length]);
+  try { localStorage.setItem('cs-stage', G.stage); } catch (e) { /* sin almacenamiento */ }
+  nsfx.step();
+  if (isHost()) net.send({ t: 'stage', s: G.stage });
+}
+function updateStageLabel() {
+  $('#stageName').textContent = STAGES[G.stage].name;
+  $('#stageSel').classList.toggle('locked', isGuest() || G.mode === 'arcade');
+}
+$('#stagePrev').addEventListener('click', () => { if (!isGuest() && G.mode !== 'arcade') cycleStage(-1); });
+$('#stageNext').addEventListener('click', () => { if (!isGuest() && G.mode !== 'arcade') cycleStage(1); });
+
+// ---------------------------------------------------------------- torneo
+const ARCADE_LEVELS = ['facil', 'normal', 'normal', 'dificil', 'dificil'];
+const ARCADE_STAGES = ['dia', 'atardecer', 'dia', 'atardecer', 'noche'];
+function startArcade() {
+  if (sel.started) return;
+  sel.started = true;
+  const me = sel.cur[0];
+  const rivals = ROSTER.map((_, i) => i).filter((i) => i !== me).sort(() => Math.random() - 0.5);
+  G.arcade = { me, order: rivals, idx: 0, lost: false };
+  showLadder();
+}
+function showLadder(msg = '') {
+  const A = G.arcade;
+  G.phase = 'ladder';
+  selectEl.classList.add('hidden'); hud.classList.add('hidden'); touchEl.classList.add('hidden');
+  endEl.classList.add('hidden');
+  const champion = A.idx >= A.order.length;
+  $('#ladderTitle').textContent = champion ? '¡CAMPEÓN DEL TORNEO!' : 'TORNEO';
+  $('#ladderRow').innerHTML = A.order.map((ri, k) => {
+    const st = k < A.idx ? 'done' : k === A.idx ? 'next' : '';
+    return `<div class="rung ${st}"><div class="ph" style="background-image:url(${portraits[ri] || ''})"></div><span>${ROSTER[ri].name}</span></div>`;
+  }).join('');
+  const lvl = champion ? '' : LEVELS[ARCADE_LEVELS[A.idx]].name;
+  $('#ladderInfo').textContent = champion
+    ? `Has vencido a los cinco rivales con ${ROSTER[A.me].name}.`
+    : (msg || `Combate ${A.idx + 1} de ${A.order.length}: contra ${ROSTER[A.order[A.idx]].name} · CPU ${lvl} · ${STAGES[ARCADE_STAGES[A.idx]].name}`);
+  $('#ladderGo').textContent = A.lost ? 'Reintentar' : '¡A pelear!';
+  $('#ladderGo').classList.toggle('hidden', champion);
+  $('#ladder').classList.remove('hidden');
+  if (champion) confetti.burst(new THREE.Vector3(0, RING_TOP, 0));
+}
+function arcadeNext() {
+  const A = G.arcade;
+  if (!A || A.idx >= A.order.length) return;
+  A.lost = false;
+  sel.cur = [A.me, A.order[A.idx]];
+  applyStage(ARCADE_STAGES[A.idx]);
+  $('#ladder').classList.add('hidden');
+  beginMatch();
+}
+function arcadeAfterMatch(w) {
+  const A = G.arcade;
+  if (w.index === 0) { A.idx++; A.lost = false; showLadder(); }
+  else { A.lost = true; showLadder(`${ROSTER[A.order[A.idx]].name} te ha ganado. ¡Inténtalo otra vez!`); }
+}
+$('#ladderGo').addEventListener('click', arcadeNext);
 
 // ---------------------------------------------------------------- remate final
 const FINISH_DIST = { sp_dragon: 0.9, sp_storm: 1.0, sp_quake: 1.6, sp_shadow: 2.4, sp_charge: 2.2, sp_lotus: 3.0 };
@@ -558,8 +641,10 @@ function playEvent(e) {
   else if (k === 'a') announce(e[1], e[2], e[3], e[4]);
   else if (k === 'p') pop(e[1], e[2]);
   else if (k === 'c') comic(des(e[1]), e[2]);
+  else if (k === 'k') showCombo(e[1], e[2], e[3]);
   else if (k === 'start') {
     if (e[1]) { sel.cur = e[1].slice(); applyPicks(sel.cur); }
+    if (e[2]) applyStage(e[2]);
     fighters.forEach((f) => f.reset(f.index ? 1.5 : -1.5, f.index ? -Math.PI / 2 : Math.PI / 2));
     G.camN.set(0, 0, 1);
     showFightUi();
@@ -582,6 +667,8 @@ net.on('data', (d) => {
     else if (d.t === 'rematch' && G.phase === 'matchEnd') beginMatch();
     else if (d.t === 'reselect' && G.phase === 'matchEnd') { openSelect('online'); net.send({ t: 'toSelect' }); }
     else if (d.t === 'sel') applyRemoteSel(d);
+  } else if (d.t === 'stage') {
+    applyStage(d.s);
   } else if (d.t === 's') {
     applySnapshot(d);
   } else if (d.t === 'toSelect') {
@@ -692,6 +779,7 @@ function showEndPanel(name) {
 }
 function showMatchEnd() {
   const w = fighters.find((f) => f.wins >= ROUNDS_TO_WIN);
+  if (G.mode === 'arcade') { arcadeAfterMatch(w); return; }
   if (isHost()) outbox.push(['end', w.name]);
   showEndPanel(w.name);
 }
@@ -706,6 +794,8 @@ function toMenu() {
   touchEl.classList.add('hidden');
   selectEl.classList.add('hidden');
   $('#trainInfo').classList.add('hidden');
+  $('#ladder').classList.add('hidden');
+  G.arcade = null;
   menu.classList.remove('hidden');
   announceEl.className = ''; subEl.className = ''; popEl.className = '';
   resetRound();
@@ -822,6 +912,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyT' && G.mode === 'training') cycleDummy();
   if (e.code === 'Escape') togglePause();
   if (e.code === 'Enter') {
+    if (G.phase === 'ladder') { arcadeNext(); return; }
     if (G.phase === 'menu' && !menu.classList.contains('hidden')) startMatch(TOUCH ? 'cpu' : '2p');
     else if (G.phase === 'matchEnd') rematch();
   }
@@ -878,7 +969,7 @@ function makePortraits() {
 // Qué ranuras controla este dispositivo, y con qué jugador del teclado.
 function localSlots() {
   if (G.mode === 'online') return net.role === 'host' ? [[0, 0]] : [[1, 0]];
-  if (G.mode === 'cpu' || G.mode === 'training') return [[0, 0]];
+  if (G.mode === 'cpu' || G.mode === 'training' || G.mode === 'arcade') return [[0, 0]];
   return [[0, 0], [1, 1]];
 }
 
@@ -891,6 +982,9 @@ function openSelect(mode) {
   pauseEl.classList.add('hidden'); hud.classList.add('hidden'); touchEl.classList.add('hidden');
   announceEl.className = ''; subEl.className = ''; popEl.className = '';
   selectEl.classList.remove('hidden');
+  selectEl.classList.toggle('arcade', mode === 'arcade');
+  sel.started = false;
+  updateStageLabel();
   resetRound();
   fighters[0].reset(-1.1, Math.PI / 2 - 0.5);
   fighters[1].reset(1.1, -Math.PI / 2 + 0.5);
@@ -954,6 +1048,13 @@ function selectStep() {
     if (sel.cpuT % 8 === 0) { sel.cur[1] = (sel.cur[1] + 1) % ROSTER.length; renderSelect(); }
     if (sel.cpuT > 50) { sel.cur[1] = (Math.random() * ROSTER.length) | 0; confirmPick(1, true); }
   }
+  if (G.mode === 'arcade' && sel.ok[0]) { if (++sel.t > 40) startArcade(); return; }
+  // escenario: J1 con Q / E (en online solo el anfitrión)
+  if (!isGuest()) {
+    const p0 = input.players[0].pressed;
+    if (p0.sideIn) cycleStage(-1);
+    if (p0.sideOut) cycleStage(1);
+  }
   if (sel.ok[0] && sel.ok[1]) {
     if (++sel.t > 55 && !isGuest()) beginMatch();
   } else sel.t = 0;
@@ -978,7 +1079,7 @@ function renderSelect() {
     box.querySelector('.tt').textContent = `${d.title} · ${d.origin}`;
     box.querySelector('.stats').innerHTML = statsHtml(d);
     box.querySelector('.sp').innerHTML = `<b>Especial:</b> ${d.special.name}. <span>${d.special.desc}.</span>`;
-    let who = i === 0 ? 'J1' : (G.mode === 'cpu' ? 'CPU' : G.mode === 'training' ? 'MUÑECO' : 'J2');
+    let who = i === 0 ? 'J1' : (G.mode === 'cpu' ? 'CPU' : G.mode === 'training' ? 'MUÑECO' : G.mode === 'arcade' ? 'TORNEO' : 'J2');
     if (G.mode === 'online') who = mine.includes(i) ? 'TÚ' : 'RIVAL';
     box.querySelector('.who').textContent = who;
     box.querySelector('.state').textContent = sel.ok[i] ? '¡LISTO!' : (mine.includes(i) ? (TOUCH ? 'Toca otra vez para confirmar' : 'Elige y confirma') : 'Eligiendo…');
@@ -995,7 +1096,7 @@ function renderSelect() {
 // ---------------------------------------------------------------- bucle
 let arena = null;
 let acc = 0, last = performance.now();
-let emberAcc = 0, lastPhase = '';
+let emberAcc = 0, lastPhase = '', lastHp = MAX_HP;
 const paused0 = () => G.phase === 'paused';
 function frame(now) {
   requestAnimationFrame(frame);
@@ -1030,7 +1131,17 @@ function frame(now) {
   }
   lastPhase = G.phase;
   confetti.update(paused0() ? 0 : dt);
-  env.torches.forEach((l, i) => { l.intensity = 7 + Math.sin(t * 13 + i * 2) * 0.8 + Math.sin(t * 29 + i) * 0.6; });
+  const tb = env.torchBase || 7;
+  env.torches.forEach((l, i) => { l.intensity = tb + (Math.sin(t * 13 + i * 2) * 0.8 + Math.sin(t * 29 + i) * 0.6) * tb / 7; });
+  if (env.night && Math.random() < dt * 6) { // luciérnagas alrededor del ring
+    const a = Math.random() * Math.PI * 2, r = 5.5 + Math.random() * 9;
+    fx.firefly(new THREE.Vector3(Math.cos(a) * r, 0.6 + Math.random() * 2.5, Math.sin(a) * r));
+  }
+  // vibración en el móvil cuando te golpean
+  const me = isGuest() ? 1 : 0;
+  const hpNow = fighters[me].hp;
+  if (TOUCH && navigator.vibrate && hpNow < lastHp && !['menu', 'select', 'loading'].includes(G.phase)) navigator.vibrate(lastHp - hpNow > 15 ? 70 : 30);
+  lastHp = hpNow;
   if (arena) {
     if (arena.waterTex) { arena.waterTex.offset.x = t * 0.01; arena.waterTex.offset.y = t * 0.006; }
     arena.fires.forEach((f, i) => { f.scale.set(1 + Math.sin(t * 17 + i) * 0.1, 1.4 + Math.sin(t * 11 + i * 3) * 0.25, 1 + Math.cos(t * 15 + i) * 0.1); });
@@ -1067,6 +1178,9 @@ function frame(now) {
   }
   $('#loading').classList.add('hidden');
   resetRound();
+  let saved = 'atardecer';
+  try { saved = localStorage.getItem('cs-stage') || saved; } catch (e) { /* sin almacenamiento */ }
+  applyStage(saved);
   G.phase = 'menu';
   updateCamera(0, true);
   // enlace de invitación: ?sala=CODIGO
@@ -1085,7 +1199,7 @@ requestAnimationFrame(frame);
 
 // para depurar desde la consola
 window.__game = {
-  G, fighters, startMatch, beginMatch, sel: () => sel, input, net, music, trails, confetti, camera, fx, post: () => post,
+  G, fighters, startMatch, beginMatch, sel: () => sel, input, net, music, trails, confetti, camera, fx, post: () => post, startArcade, arcadeNext, applyStage,
   draw() { updateCamera(1 / 60, true); updateHud(); renderProjectiles(performance.now() / 1000); post.render(); },
   advance(n = 1) { for (let i = 0; i < n; i++) { step(); fighters.forEach((f) => f.render(STEP)); fx.update(STEP); } },
 };

@@ -27,7 +27,8 @@ export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
   const clouds = makeClouds(scene);
   scene.fog = new THREE.Fog(0xffb995, 60, 170);
 
-  scene.add(new THREE.HemisphereLight(0xfff0e0, 0x8a6a9a, 1.1));
+  const hemi = new THREE.HemisphereLight(0xfff0e0, 0x8a6a9a, 1.1);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
   sun.position.set(9, 15, 11);
   sun.castShadow = true;
@@ -48,7 +49,82 @@ export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
   // luz de contorno detrás de los luchadores (la mueve la cámara) para separarlos del fondo
   const rim = new THREE.DirectionalLight(0x9fe8ff, 2.0);
   scene.add(rim, rim.target);
-  return { torches, rim, clouds };
+  // cielo nocturno: estrellas y luna (ocultas salvo en el escenario de noche)
+  const starGeo = new THREE.BufferGeometry();
+  const sp = [];
+  for (let i = 0; i < 700; i++) {
+    const th = Math.random() * Math.PI * 2, ph = Math.random() * Math.PI * 0.42;
+    sp.push(Math.cos(th) * Math.sin(ph) * 380, Math.cos(ph) * 380 * 0.9 + 10, Math.sin(th) * Math.sin(ph) * 380);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.9 }));
+  stars.visible = false;
+  scene.add(stars);
+  const moonMat = new THREE.SpriteMaterial({ map: moonTexture(), fog: false, transparent: true, depthWrite: false });
+  moonMat.color.multiplyScalar(2.5);
+  const moon = new THREE.Sprite(moonMat);
+  moon.position.set(-80, 120, -260);
+  moon.scale.setScalar(38);
+  moon.visible = false;
+  scene.add(moon);
+  return { torches, rim, clouds, sky: skyMat, hemi, sun, stars, moon, stage: 'atardecer' };
+}
+
+function moonTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 20, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,250,230,1)');
+  gr.addColorStop(0.45, 'rgba(255,248,225,1)');
+  gr.addColorStop(0.5, 'rgba(200,220,255,0.35)');
+  gr.addColorStop(1, 'rgba(160,190,255,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 128, 128);
+  g.fillStyle = 'rgba(210,200,180,0.5)';
+  for (const [x, y, r] of [[52, 54, 7], [72, 70, 9], [60, 78, 5], [76, 50, 4]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// ---------------------------------------------------------------- escenarios (hora del día)
+export const STAGES = {
+  atardecer: {
+    name: 'Atardecer', sky: [0x3d8bff, 0xffb38a, 0x7a4a8a], fog: [0xffb995, 60, 170],
+    hemi: [0xfff0e0, 0x8a6a9a, 1.1], sun: [0xfff0d8, 2.6, [9, 15, 11]], rim: 0x9fe8ff, torch: 7,
+    water: 0x18a8c8, cloud: 0xfff2ee, night: false, exposure: 1.0,
+  },
+  dia: {
+    name: 'Mediodía', sky: [0x1f7bff, 0xbfe8ff, 0x9ec8e8], fog: [0xcfeaff, 70, 190],
+    hemi: [0xffffff, 0x9ab07a, 1.25], sun: [0xffffff, 3.0, [4, 22, 6]], rim: 0xffffff, torch: 3,
+    water: 0x22c4e0, cloud: 0xffffff, night: false, exposure: 1.02,
+  },
+  noche: {
+    name: 'Noche', sky: [0x040822, 0x1c2c72, 0x2a1a48], fog: [0x1a2256, 40, 150],
+    hemi: [0x7a8aff, 0x2a1a3a, 0.6], sun: [0x9ab8ff, 1.3, [-8, 14, -10]], rim: 0x6fa8ff, torch: 16,
+    water: 0x0e3e78, cloud: 0x5a6aa8, night: true, exposure: 1.0,
+  },
+};
+export const STAGE_KEYS = Object.keys(STAGES);
+
+export function setStage(env, arena, scene, renderer, key) {
+  const S = STAGES[key] || STAGES.atardecer;
+  env.stage = key in STAGES ? key : 'atardecer';
+  env.sky.uniforms.top.value.setHex(S.sky[0]);
+  env.sky.uniforms.mid.value.setHex(S.sky[1]);
+  env.sky.uniforms.bottom.value.setHex(S.sky[2]);
+  scene.fog.color.setHex(S.fog[0]); scene.fog.near = S.fog[1]; scene.fog.far = S.fog[2];
+  env.hemi.color.setHex(S.hemi[0]); env.hemi.groundColor.setHex(S.hemi[1]); env.hemi.intensity = S.hemi[2];
+  env.sun.color.setHex(S.sun[0]); env.sun.intensity = S.sun[1]; env.sun.position.set(...S.sun[2]);
+  env.rim.color.setHex(S.rim);
+  env.torchBase = S.torch;
+  env.stars.visible = S.night;
+  env.moon.visible = S.night;
+  env.night = S.night;
+  for (const c of env.clouds) c.material.color.setHex(S.cloud);
+  if (arena && arena.waterMat) arena.waterMat.color.setHex(S.water);
+  renderer.toneMappingExposure = S.exposure;
 }
 
 function cloudTexture() {
@@ -184,7 +260,7 @@ export async function loadArena(scene, base = 'assets/') {
   const fires = [];
   root.traverse((o) => { if (o.userData.fire) fires.push(o); });
   const banners = makeBanners(scene);
-  return { root, waterTex, fires, banners };
+  return { root, waterTex, fires, banners, waterMat: water ? water.material : null };
 }
 
 // ---------------------------------------------------------------- estandartes
@@ -364,6 +440,9 @@ export class FX {
     r.s.material.color.set(color).multiplyScalar(3.5);
     r.life = r.max = life; r.size = size;
     r.s.visible = true;
+  }
+  firefly(pos) {
+    this.emit(pos, 0xd8ff6a, 1, 0.006, 0.08, 120, -0.0001);
   }
   ember(pos) {
     this.emit(pos, 0xff9a30, 1, 0.012, 0.07, 70, -0.0006);
