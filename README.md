@@ -19,6 +19,20 @@ Antes de cada combate se elige luchador. Si los dos eligen el mismo, el segundo 
 | **Torak**, Furia de las Montañas | Guerrero tribal | Alto | Media | Alto |
 | **Sera**, Loto Dorado | Monja guerrera | Medio | Alta | Medio |
 
+### Movimiento
+
+- **Doble toque adelante**: carrera corta. Si golpeas durante la carrera sale un codazo o una patada de empuje.
+- **Doble toque atrás**: retroceso rápido para salir del alcance.
+- Cada luchador tiene su propia guardia, su forma de moverse en reposo (Rina da saltitos, Voss respira pesado, Nyx se balancea, Sera mueve los brazos), una pose de presentación al empezar la ronda y una pose de victoria.
+
+### Remate final
+
+Al ganar la ronda decisiva por K.O., el rival se levanta aturdido y aparece **¡REMÁTALO!**: pulsa el especial (o puño + patada) en unos segundos para rematar con tu golpe estrella, con cámara lenta y giro de cámara. La CPU también remata.
+
+### Práctica
+
+En el menú, **Práctica**: luchas contra un muñeco sin tiempo, sin K.O., con la energía siempre llena y la vida que se recupera sola. `T` (o tocar el aviso de arriba) cambia el muñeco: quieto, se cubre, agachado o pelea.
+
 ### Golpes especiales y energía
 
 Cada luchador tiene un especial propio. Se lanza con la tecla de especial (`R` el J1, `P` el J2, `Y` en el mando, botón ESPECIAL en el móvil) o pulsando **puño y patada a la vez**. Gasta media barra de energía; la barra está debajo de la vida y se llena al golpear, al recibir golpes y al bloquear.
@@ -70,7 +84,7 @@ Cómo funciona: los móviles se conectan directamente entre sí con WebRTC ([Pee
 
 Mandos: stick/cruceta para moverse, X = puño, A = patada, B/RT = guardia, LB/RB = esquivar. El mando 1 controla al jugador 1 y el mando 2 al jugador 2.
 
-`Esc` pausa. `Enter` en el menú empieza una partida de 2 jugadores. También hay modo **1 jugador contra la CPU**, con tres niveles de dificultad (botón *CPU: Normal* del menú).
+`Esc` pausa. `Enter` en el menú empieza una partida de 2 jugadores. También hay modo **1 jugador contra la CPU**, con tres niveles de dificultad (botón *CPU: Normal* del menú), y un modo **Práctica**.
 
 ### Movimientos
 

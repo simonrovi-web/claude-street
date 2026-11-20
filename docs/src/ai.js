@@ -8,7 +8,7 @@ const blank = () => Object.fromEntries([...ACTIONS, 'fwd', 'back'].map((a) => [a
 export const LEVELS = {
   facil: { name: 'Fácil', react: 0.025, cool: [45, 40], guard: 0.12, combo: 0.25, special: 0.01, escape: 0.03 },
   normal: { name: 'Normal', react: 0.08, cool: [22, 30], guard: 0.3, combo: 0.5, special: 0.03, escape: 0.15 },
-  dificil: { name: 'Difícil', react: 0.2, cool: [10, 16], guard: 0.45, combo: 0.8, special: 0.08, escape: 0.4 },
+  dificil: { name: 'Difícil', react: 0.22, cool: [7, 10], guard: 0.18, combo: 0.85, special: 0.1, escape: 0.45 },
 };
 
 // alcance a partir del cual tiene sentido lanzar cada especial

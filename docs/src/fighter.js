@@ -17,7 +17,8 @@ export const MAX_HP = 200;
 export const SPECIAL_COST = 50;   // la barra de energía llega a 100
 
 const ACTIONABLE = new Set(['idle', 'walk', 'crouch', 'guard', 'crouchGuard']);
-const INVULN = new Set(['knockdown', 'ko', 'getup', 'ringout', 'thrown', 'victory']);
+const DASH_WINDOW = 12; // frames para el doble toque
+const INVULN = new Set(['knockdown', 'ko', 'getup', 'ringout', 'thrown', 'victory', 'intro']);
 const KNOCKBACK = new Set(['hitstun', 'blockstun', 'knockdown', 'ko']);
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -52,6 +53,12 @@ export class Fighter {
     this.alt = alt;
     this.name = def.name;
     this.stats = def.stats;
+    const st = def.style || {};
+    this.idleStyle = st.idle || 'steady';
+    this.stancePose = over(STANCE, st.stance || {});
+    this.introPose = over(this.stancePose, st.intro || {});
+    this.victoryPose = st.victory ? over(STANCE, st.victory) : VICTORY;
+    this.victoryPump = !st.victory;
     Object.assign(this, buildModel(def, alt));
     this.root.scale.setScalar(def.build.scale);
     this.scene.add(this.root);
@@ -92,6 +99,7 @@ export class Fighter {
     this.stun = 0;
     this.thrower = null;
     if (this.meter === undefined) this.meter = 0;
+    this.tapF = 99; this.tapB = 99;
     this.root.visible = true;
   }
 
@@ -149,6 +157,16 @@ export class Fighter {
     if (!this.canSpecial()) return false;
     this.startAttack(this.def.special.move, G);
     return true;
+  }
+
+  startDash(dir, G) {
+    const f = this.fwd();
+    const v = (dir > 0 ? 0.15 : 0.13) * Math.sqrt(this.stats.speed);
+    this.vel.x = f.x * v * dir;
+    this.vel.z = f.z * v * dir;
+    this.tapF = this.tapB = 99;
+    this.setState(dir > 0 ? 'dash' : 'backdash');
+    G.sfx.step();
   }
 
   startJump(inp) {
@@ -243,6 +261,7 @@ export class Fighter {
 
   knockdown(dir, push, pop) {
     this.setState('knockdown');
+    this.bounced = false;
     const k = push * 0.45;
     this.vel.set(dir.x * k, pop, dir.z * k);
     this.pos.y += 0.01;
@@ -254,6 +273,7 @@ export class Fighter {
   update(inp, opp, G) {
     this.f++;
     if (this.flash > 0) this.flash--;
+    this.tapF++; this.tapB++;
 
     if (ACTIONABLE.has(this.state)) {
       this.turnTo(opp, 0.2);
@@ -266,11 +286,15 @@ export class Fighter {
       else if (pr.punch) this.startAttack(down ? 'lowPunch' : held.fwd ? 'elbow' : 'jab', G);
       else if (pr.kick) this.startAttack(down ? 'sweep' : held.fwd ? 'pushKick' : 'kick', G);
       else if (pr.up && !down) this.startJump(inp);
+      else if (pr.fwd && !down && !held.guard && this.tapF < DASH_WINDOW) this.startDash(1, G);
+      else if (pr.back && !down && !held.guard && this.tapB < DASH_WINDOW) this.startDash(-1, G);
       else if (pr.sideIn || pr.sideOut) {
         this.sideVec = this.lateral(pr.sideOut ? 1 : -1, G.camN);
         this.setState('sidestep');
         G.sfx.step();
       } else {
+        if (pr.fwd) this.tapF = 0;
+        if (pr.back) this.tapB = 0;
         let st;
         if (down) st = held.guard ? 'crouchGuard' : 'crouch';
         else if (held.guard) st = 'guard';
@@ -294,6 +318,13 @@ export class Fighter {
           }
           break;
         case 'land': if (this.f >= 7) this.toIdle(); break;
+        case 'dash':
+          // desde la carrera se puede golpear: sale el golpe "hacia delante"
+          if (this.f > 4 && inp.pressed.punch) this.startAttack('elbow', G);
+          else if (this.f > 4 && inp.pressed.kick) this.startAttack('pushKick', G);
+          else if (this.f >= 14) this.toIdle();
+          break;
+        case 'backdash': if (this.f >= 16) this.toIdle(); break;
         case 'sidestep': {
           const k = Math.max(0, 1 - this.f / 14) * 0.085 * Math.sqrt(this.stats.speed);
           this.pos.addScaledVector(this.sideVec, k);
@@ -437,6 +468,7 @@ export class Fighter {
     } else if (this.state === 'knockdown') {
       G.sfx.thud();
       G.fx.dust(this.pos);
+      if (!this.bounced) { this.bounced = true; this.vel.y = 0.05; this.pos.y += 0.001; } // rebote
     } else if (this.state === 'ringout') {
       G.onSplash(this);
     }
@@ -444,44 +476,98 @@ export class Fighter {
 
   // ------------------------------------------------------------ animación
   targetPose() {
-    const t = this.f;
+    const t = this.f, T = this.time, B = this.stancePose;
     switch (this.state) {
-      case 'idle': return over(STANCE, { y: STANCE.y + Math.sin(this.time * 0.07) * 0.012, sx: STANCE.sx + Math.sin(this.time * 0.07) * 0.02 });
+      case 'idle': return this.idlePose(B, T);
       case 'walk': {
-        const ph = this.time * 0.24 * this.walkDir;
-        return over(STANCE, {
-          lhx: STANCE.lhx + Math.sin(ph) * 0.3, rhx: STANCE.rhx - Math.sin(ph) * 0.3,
-          lkx: STANCE.lkx + Math.max(0, Math.cos(ph)) * 0.45, rkx: STANCE.rkx + Math.max(0, -Math.cos(ph)) * 0.45,
-          y: STANCE.y - Math.abs(Math.sin(ph)) * 0.025,
+        // al andar se balancean brazos y hombros; hacia atrás el paso es más corto
+        const back = this.walkDir < 0;
+        const ph = T * (back ? 0.2 : 0.26) * this.walkDir;
+        const sw = Math.sin(ph), k = back ? 0.7 : 1;
+        return over(B, {
+          lhx: B.lhx + sw * 0.32 * k, rhx: B.rhx - sw * 0.32 * k,
+          lkx: B.lkx + Math.max(0, Math.cos(ph)) * 0.5 * k, rkx: B.rkx + Math.max(0, -Math.cos(ph)) * 0.5 * k,
+          lsx: B.lsx - sw * 0.12, rsx: B.rsx + sw * 0.12,
+          sy: B.sy + sw * 0.08, sx: B.sx + (back ? -0.04 : 0.05),
+          y: B.y - Math.abs(Math.sin(ph)) * 0.03,
         });
       }
+      case 'dash': return over(B, { y: B.y - 0.08, sx: B.sx + 0.25, lhx: -0.9, lkx: 0.9, rhx: 0.7, rkx: 0.5, lsx: B.lsx - 0.2, rsx: B.rsx + 0.3 });
+      case 'backdash': return over(B, { y: B.y - 0.04, sx: B.sx - 0.2, hd: 0.1, lhx: 0.3, lkx: 0.6, rhx: -0.5, rkx: 1.1, lsx: B.lsx + 0.1, rsx: B.rsx + 0.1 });
       case 'crouch': return CROUCH;
-      case 'guard': return GUARD;
+      case 'guard': return over(GUARD, { y: GUARD.y + Math.sin(T * 0.09) * 0.008 });
       case 'crouchGuard': return CROUCH_GUARD;
-      case 'jump': return JUMP;
+      case 'jump': {
+        // recoge las piernas al subir y las estira para caer
+        const up = this.vel.y > 0;
+        return over(JUMP, up ? { lkx: 2.1, rkx: 1.9, lhx: -1.4, rhx: -0.8, sx: 0.2 } : { lkx: 0.9, rkx: 0.8, lhx: -0.6, rhx: -0.2, sx: 0.05 });
+      }
       case 'land': return LAND;
       case 'sidestep': return SIDESTEP;
       case 'attack': return this.attackPose();
       case 'hitstun': {
+        // la reacción gira hacia un lado u otro para que no todos los golpes se vean iguales
+        const side = this.hp % 2 ? 1 : -1;
         const hp = this.hitLevel === 'high' ? HIT_HIGH : this.hitLevel === 'crouch' ? HIT_CROUCH : HIT_MID;
-        const base = this.hitLevel === 'crouch' ? CROUCH : STANCE;
-        return lerpPose(hp, base, Math.max(0, (t - this.stun * 0.4) / (this.stun * 0.6)));
+        const base = this.hitLevel === 'crouch' ? CROUCH : B;
+        const twist = over(hp, { sy: hp.sy + side * 0.45, hy: hp.hy + side * 0.15, lsz: hp.lsz + (side > 0 ? 0.3 : 0), rsz: hp.rsz - (side < 0 ? 0.3 : 0) });
+        return lerpPose(twist, base, Math.max(0, (t - this.stun * 0.4) / (this.stun * 0.6)));
       }
       case 'blockstun': return this.blockCrouch ? BLOCK_CROUCH : BLOCK;
-      case 'knockdown':
+      case 'knockdown': {
+        // en el aire agita brazos y piernas; en el suelo se queda tendido
+        if (this.pos.y > this.groundY() + 0.05) {
+          const s = Math.sin(T * 0.6);
+          return over(KNOCK, { tilt: -1.1, lsx: -1.6 + s * 0.5, rsx: -1.8 - s * 0.5, lhx: -0.8 + s * 0.3, rhx: -0.3 - s * 0.3 });
+        }
+        return KNOCK;
+      }
       case 'ko': return KNOCK;
-      case 'getup': return t < 12 ? lerpPose(KNOCK, CROUCH, t / 12) : lerpPose(CROUCH, STANCE, Math.min(1, (t - 12) / 14));
+      case 'getup': return t < 12 ? lerpPose(KNOCK, CROUCH, t / 12) : lerpPose(CROUCH, B, Math.min(1, (t - 12) / 14));
       case 'throwing': return samplePose(THROW_KEYS, t);
       case 'thrown': return over(KNOCK, { tilt: -Math.min(1, t / 32) * 1.5, lsx: -2.4, rsx: -2.4, lift: 0.1 });
       case 'ringout': {
-        const s = Math.sin(this.time * 0.5);
+        const s = Math.sin(T * 0.5);
         return over(KNOCK, { tilt: -0.7, lsx: -2.6 + s * 0.5, rsx: -2.6 - s * 0.5, lhx: -0.6 + s * 0.3, rhx: -0.2 - s * 0.3 });
       }
+      case 'intro': {
+        const k = Math.min(1, t / 25);
+        return lerpPose(B, this.introPose, k);
+      }
+      case 'dazed': {
+        // aturdido antes del remate: se tambalea con los brazos caídos
+        const s = Math.sin(T * 0.08);
+        return over(B, { y: -0.12, sx: 0.35, hd: 0.45, hy: B.hy + s * 0.25, sy: s * 0.2, lsx: -0.2, rsx: -0.15, lsz: 0.15, rsz: -0.15, lex: -0.3, rex: -0.4, lkx: 0.6, rkx: 0.5 });
+      }
       case 'victory': {
-        const s = Math.max(0, Math.sin(this.time * 0.12));
+        if (!this.victoryPump) return over(this.victoryPose, { y: this.victoryPose.y + Math.sin(T * 0.06) * 0.01 });
+        const s = Math.max(0, Math.sin(T * 0.12));
         return over(VICTORY, { lex: -0.3 - s * 0.6, y: s * 0.03 });
       }
-      default: return STANCE;
+      default: return B;
+    }
+  }
+
+  idlePose(B, T) {
+    switch (this.idleStyle) {
+      case 'bounce': { // saltitos de boxeadora
+        const b = Math.abs(Math.sin(T * 0.16));
+        return over(B, { y: B.y + b * 0.035 - 0.02, lkx: B.lkx + (1 - b) * 0.15, rkx: B.rkx + (1 - b) * 0.15, lsx: B.lsx + Math.sin(T * 0.16) * 0.05 });
+      }
+      case 'heavy': { // respiración lenta y hombros que suben y bajan
+        const b = Math.sin(T * 0.05);
+        return over(B, { y: B.y + b * 0.015, sx: B.sx + b * 0.03, lsz: B.lsz + b * 0.06, rsz: B.rsz - b * 0.06 });
+      }
+      case 'sway': { // balanceo felino de lado a lado
+        const b = Math.sin(T * 0.06);
+        return over(B, { hy: B.hy + b * 0.14, sy: B.sy - b * 0.1, y: B.y + Math.sin(T * 0.12) * 0.01 });
+      }
+      case 'flow': { // brazos que fluyen
+        const b = Math.sin(T * 0.05);
+        return over(B, { lsx: B.lsx + b * 0.16, rsx: B.rsx - b * 0.16, lex: B.lex - b * 0.12, sy: B.sy + b * 0.06, y: B.y + Math.cos(T * 0.05) * 0.01 });
+      }
+      default:
+        return over(B, { y: B.y + Math.sin(T * 0.07) * 0.012, sx: B.sx + Math.sin(T * 0.07) * 0.02 });
     }
   }
 

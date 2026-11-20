@@ -104,7 +104,10 @@ const G = {
   mode: '2p', phase: 'loading', phaseT: 0, round: 0, timer: ROUND_TIME * 60,
   hitstop: 0, slowmo: 0, shake: 0, camN: new THREE.Vector3(0, 0, 1),
   sfx: nsfx, fx: nfx, ai: null, roundWinner: null, crowd: null, projectiles: [], netProj: [],
+  finishAvail: false, finisher: null, finishLoser: null, dummy: 'stand', trainIdle: 0,
   onHit(att, def, A, counter, pos) {
+    G.trainIdle = 0;
+    if (G.phase === 'finish') { finisherHit(att, def, pos || hitPos(att, A)); return; }
     const heavy = A.heavy || A.knockdown || counter || def.dead;
     G.hitstop = heavy ? 9 : 5;
     G.shake = heavy ? 0.12 : 0.04;
@@ -119,6 +122,7 @@ const G = {
     combo[def.index] = 0;
   },
   onBlock(att, def, A, pos) {
+    G.trainIdle = 0;
     G.hitstop = 4;
     nsfx.block();
     nfx.hit(pos || hitPos(att, A), false, true);
@@ -144,8 +148,12 @@ const G = {
   },
   onKO(loser) {
     if (G.phase !== 'fight') return;
+    if (G.mode === 'training') { loser.hp = MAX_HP; loser.dead = false; return; } // en práctica nadie cae
     G.phase = 'ko'; G.phaseT = 0;
     G.roundWinner = fighters[1 - loser.index];
+    // en la ronda decisiva se puede rematar
+    G.finishAvail = G.roundWinner.wins + 1 >= ROUNDS_TO_WIN;
+    G.finisher = G.roundWinner; G.finishLoser = loser;
     G.slowmo = 80;
     G.hitstop = 14;
     announce('K.O.', '', 150, 'ko');
@@ -155,6 +163,7 @@ const G = {
   onRingOut(loser) {
     if (G.phase !== 'fight') return;
     G.phase = 'ko'; G.phaseT = 0;
+    G.finishAvail = false;
     G.roundWinner = fighters[1 - loser.index];
     announce('RING OUT', '', 150, 'ko');
     if (G.crowd) G.crowd.excite = 1;
@@ -211,7 +220,7 @@ function resetRound() {
 function setNames() {
   const you = G.mode === 'online' ? (net.role === 'host' ? 0 : 1) : -1;
   $('.p1 .name').textContent = fighters[0].name + (you === 0 ? ' (TÚ)' : '');
-  $('.p2 .name').textContent = fighters[1].name + (G.mode === 'cpu' ? ' (CPU)' : you === 1 ? ' (TÚ)' : '');
+  $('.p2 .name').textContent = fighters[1].name + (G.mode === 'cpu' ? ' (CPU)' : G.mode === 'training' ? ' (MUÑECO)' : you === 1 ? ' (TÚ)' : '');
 }
 
 function showFightUi() {
@@ -222,6 +231,8 @@ function showFightUi() {
   selectEl.classList.add('hidden');
   hud.classList.remove('hidden');
   touchEl.classList.toggle('hidden', !TOUCH || G.mode === '2p');
+  $('#trainInfo').classList.toggle('hidden', G.mode !== 'training');
+  if (G.mode === 'training') updateTrainInfo();
   $('#btnPause').classList.toggle('hidden', G.mode === 'online');
   setNames();
 }
@@ -247,13 +258,17 @@ function beginMatch() {
 function startRound() {
   G.round++;
   resetRound();
+  G.finishAvail = false;
+  fighters.forEach((f) => f.setState('intro')); // pose de presentación de cada luchador
   G.phase = 'intro'; G.phaseT = 0;
+  if (G.mode === 'training') { announce('PRÁCTICA', '', 60); G.phaseT = 60; return; }
   const last = fighters.every((f) => f.wins === ROUNDS_TO_WIN - 1);
   announce(last ? 'RONDA FINAL' : `RONDA ${G.round}`, '', 80);
 }
 
 function endRound() {
   const w = G.roundWinner;
+  if (G.mode === 'training') { G.phase = 'roundEnd'; G.phaseT = 120; return; }
   if (w) {
     w.wins++;
     if (!w.invulnerable() && w.state !== 'ko') w.setState('victory');
@@ -279,14 +294,25 @@ function step() {
 
   if (G.phase === 'intro') {
     if (G.phaseT === 85) { announce('¡PELEA!', '', 45, 'fight'); nsfx.bell(); }
-    if (G.phaseT >= 100) G.phase = 'fight';
+    if (G.phaseT >= 100) {
+      G.phase = 'fight';
+      fighters.forEach((f) => { if (f.state === 'intro') f.toIdle(); });
+    }
   } else if (G.phase === 'fight') {
-    if (--G.timer <= 0) timeOver();
+    if (G.mode === 'training') trainingTick();
+    else if (--G.timer <= 0) timeOver();
   } else if (G.phase === 'ko') {
-    if (G.phaseT >= 170) endRound();
+    const L = G.finishLoser;
+    if (G.finishAvail && G.phaseT >= 110 && L && L.state === 'ko' && !L.outOfRing) startFinishWait();
+    else if (G.phaseT >= 170) endRound();
+  } else if (G.phase === 'finishWait') {
+    if (G.phaseT >= 160) cancelFinish();
+  } else if (G.phase === 'finish') {
+    if (G.phaseT >= 170) { G.phase = 'ko'; G.phaseT = 150; }
   } else if (G.phase === 'roundEnd') {
     if (G.phaseT >= 150) {
-      if (fighters.some((f) => f.wins >= ROUNDS_TO_WIN)) showMatchEnd();
+      if (G.mode === 'training') startRound();
+      else if (fighters.some((f) => f.wins >= ROUNDS_TO_WIN)) showMatchEnd();
       else startRound();
     }
   }
@@ -296,10 +322,12 @@ function step() {
   input.poll();
   remote.poll();
 
+  if (G.phase === 'finishWait') checkFinishInput();
   const camRight = new THREE.Vector3(G.camN.z, 0, -G.camN.x);
   const inputs = fighters.map((f, i) => {
     if (G.phase !== 'fight') return NO_INPUT;
     const opp = fighters[1 - i];
+    if (i === 1 && G.mode === 'training') return dummyInput(f, opp);
     if (i === 1 && G.ai) return G.ai.think(f, opp);
     const toOpp = new THREE.Vector3().subVectors(opp.pos, f.pos);
     const raw = (i === 1 && G.mode === 'online') ? remote : input.players[i];
@@ -323,6 +351,83 @@ function step() {
   if (G.crowd) G.crowd.excite = Math.max(0.15, G.crowd.excite - 0.004);
   sendSnapshot();
 }
+
+// ---------------------------------------------------------------- remate final
+const FINISH_DIST = { sp_dragon: 0.9, sp_storm: 1.0, sp_quake: 1.6, sp_shadow: 2.4, sp_charge: 2.2, sp_lotus: 3.0 };
+function startFinishWait() {
+  const W = G.finisher, L = G.finishLoser;
+  G.phase = 'finishWait'; G.phaseT = 0;
+  L.setState('dazed');
+  L.pos.y = RING_TOP; L.vel.set(0, 0, 0);
+  L.facing = Math.atan2(W.pos.x - L.pos.x, W.pos.z - L.pos.z);
+  if (!['victory', 'ko'].includes(W.state)) W.toIdle();
+  const how = TOUCH ? 'botón ESPECIAL' : (W.index === 0 ? 'R o puño + patada' : 'P o puño + patada');
+  announce('¡REMÁTALO!', `${W.name}: ${how}`, 150, 'ko');
+}
+function checkFinishInput() {
+  const W = G.finisher;
+  if (W.index === 1 && G.ai) { if (G.phaseT === 45) startFinisher(); return; } // la CPU siempre remata
+  const raw = W.index === 1 ? (G.mode === 'online' ? remote : input.players[1]) : input.players[0];
+  const pr = raw.pressed, rc = raw.recent;
+  if (pr.special || (pr.punch && rc.kick < 4) || (pr.kick && rc.punch < 4)) startFinisher();
+}
+function startFinisher() {
+  const W = G.finisher, L = G.finishLoser;
+  G.finishAvail = false;
+  const d = new THREE.Vector3(W.pos.x - L.pos.x, 0, W.pos.z - L.pos.z);
+  if (d.lengthSq() < 1e-4) d.set(-1, 0, 0);
+  d.normalize();
+  const D = FINISH_DIST[W.def.special.move] || 1.2;
+  W.pos.set(THREE.MathUtils.clamp(L.pos.x + d.x * D, -4.7, 4.7), RING_TOP, THREE.MathUtils.clamp(L.pos.z + d.z * D, -4.7, 4.7));
+  W.facing = Math.atan2(L.pos.x - W.pos.x, L.pos.z - W.pos.z);
+  W.lastFacing = W.facing;
+  L.facing = Math.atan2(W.pos.x - L.pos.x, W.pos.z - L.pos.z);
+  W.meter = 100;
+  G.phase = 'finish'; G.phaseT = 0;
+  G.slowmo = 150;
+  announceEl.className = ''; subEl.className = '';
+  W.startAttack(W.def.special.move, G);
+}
+function finisherHit(att, def, pos) {
+  if (G.phaseT < 0) return;
+  def.flash = 7;
+  def.vel.y = 0.2; // sale despedido
+  G.hitstop = 18; G.shake = 0.45;
+  nsfx.hit(true); nsfx.thud();
+  nfx.hit(pos, true, false); nfx.burst(def.pos, 0xff5030); nfx.burst(def.pos, 0xffd060);
+  if (G.crowd) G.crowd.excite = 1;
+  announce('¡REMATE!', att.def.special.name, 150, 'win');
+  G.phase = 'ko'; G.phaseT = 40;
+}
+function cancelFinish() {
+  const L = G.finishLoser;
+  L.setState('ko');
+  G.phase = 'ko'; G.phaseT = 160;
+}
+
+// ---------------------------------------------------------------- práctica
+const DUMMY = { stand: 'Quieto', guard: 'Se cubre', crouch: 'Agachado', cpu: 'Pelea' };
+const dummyAI = new AI('normal');
+function dummyInput(f, opp) {
+  if (G.dummy === 'cpu') return dummyAI.think(f, opp);
+  const inp = { held: { ...NO_INPUT.held }, pressed: { ...NO_INPUT.pressed }, recent: NO_INPUT.recent };
+  if (G.dummy === 'guard') inp.held.guard = true;
+  if (G.dummy === 'crouch') { inp.held.down = true; inp.held.guard = true; }
+  return inp;
+}
+function trainingTick() {
+  fighters[0].meter = 100;
+  if (++G.trainIdle > 80) { fighters.forEach((f) => { f.hp = MAX_HP; }); fighters[1].meter = 0; }
+}
+function cycleDummy() {
+  const keys = Object.keys(DUMMY);
+  G.dummy = keys[(keys.indexOf(G.dummy) + 1) % keys.length];
+  updateTrainInfo();
+}
+function updateTrainInfo() {
+  $('#trainInfo').innerHTML = `PRÁCTICA · Muñeco: <b>${DUMMY[G.dummy]}</b>` + (TOUCH ? '' : ' · <kbd>T</kbd> cambiar · <kbd>Esc</kbd> salir');
+}
+$('#trainInfo').addEventListener('click', cycleDummy);
 
 // ---------------------------------------------------------------- proyectiles
 function updateProjectiles() {
@@ -485,6 +590,11 @@ function updateCamera(dt, snap = false) {
     const t = performance.now() * 0.00008;
     pos = new THREE.Vector3(Math.sin(t) * 14, 5.5, Math.cos(t) * 14);
     look = new THREE.Vector3(0, 1.5, 0);
+  } else if (G.phase === 'finish' || G.phase === 'finishWait') {
+    if (G.phase === 'finish') G.camN.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * 0.35); // giro lento
+    const dist = THREE.MathUtils.clamp(3.2 + len * 0.6, 3.8, 7);
+    look = mid.clone().add(new THREE.Vector3(0, 1.0, 0));
+    pos = mid.clone().addScaledVector(G.camN, dist).add(new THREE.Vector3(0, 1.15, 0));
   } else {
     const dist = THREE.MathUtils.clamp(4.2 + len * 0.85, 5.6, 10.5);
     look = mid.clone().add(new THREE.Vector3(0, 0.9, 0));
@@ -518,7 +628,7 @@ function updateHud() {
     b.meterBox.classList.toggle('ready', mt >= SPECIAL_COST);
     b.meterBox.classList.toggle('full', mt >= 100);
   });
-  timerEl.textContent = Math.max(0, Math.ceil(G.timer / 60));
+  timerEl.textContent = G.mode === 'training' ? '∞' : Math.max(0, Math.ceil(G.timer / 60));
   timerEl.classList.toggle('low', G.timer < 10 * 60);
 }
 
@@ -544,6 +654,7 @@ function toMenu() {
   onlineEl.classList.add('hidden');
   touchEl.classList.add('hidden');
   selectEl.classList.add('hidden');
+  $('#trainInfo').classList.add('hidden');
   menu.classList.remove('hidden');
   announceEl.className = ''; subEl.className = ''; popEl.className = '';
   resetRound();
@@ -657,6 +768,7 @@ document.querySelectorAll('.musicBtn').forEach((b) => {
 addEventListener('keydown', (e) => {
   if (e.target && e.target.tagName === 'INPUT') return;
   if (e.code === 'KeyM') toggleMusic();
+  if (e.code === 'KeyT' && G.mode === 'training') cycleDummy();
   if (e.code === 'Escape') togglePause();
   if (e.code === 'Enter') {
     if (G.phase === 'menu' && !menu.classList.contains('hidden')) startMatch(TOUCH ? 'cpu' : '2p');
@@ -713,7 +825,7 @@ function makePortraits() {
 // Qué ranuras controla este dispositivo, y con qué jugador del teclado.
 function localSlots() {
   if (G.mode === 'online') return net.role === 'host' ? [[0, 0]] : [[1, 0]];
-  if (G.mode === 'cpu') return [[0, 0]];
+  if (G.mode === 'cpu' || G.mode === 'training') return [[0, 0]];
   return [[0, 0], [1, 1]];
 }
 
@@ -783,7 +895,7 @@ function selectStep() {
       if (p.punch) confirmPick(slot, true);
     } else if (p.kick || p.guard) confirmPick(slot, false);
   }
-  if (G.mode === 'cpu' && sel.ok[0] && !sel.ok[1]) {
+  if ((G.mode === 'cpu' || G.mode === 'training') && sel.ok[0] && !sel.ok[1]) {
     // la CPU "piensa" moviendo el cursor y elige uno al azar
     sel.cpuT++;
     if (sel.cpuT % 8 === 0) { sel.cur[1] = (sel.cur[1] + 1) % ROSTER.length; renderSelect(); }
@@ -813,7 +925,7 @@ function renderSelect() {
     box.querySelector('.tt').textContent = `${d.title} · ${d.origin}`;
     box.querySelector('.stats').innerHTML = statsHtml(d);
     box.querySelector('.sp').innerHTML = `<b>Especial:</b> ${d.special.name}. <span>${d.special.desc}.</span>`;
-    let who = i === 0 ? 'J1' : (G.mode === 'cpu' ? 'CPU' : 'J2');
+    let who = i === 0 ? 'J1' : (G.mode === 'cpu' ? 'CPU' : G.mode === 'training' ? 'MUÑECO' : 'J2');
     if (G.mode === 'online') who = mine.includes(i) ? 'TÚ' : 'RIVAL';
     box.querySelector('.who').textContent = who;
     box.querySelector('.state').textContent = sel.ok[i] ? '¡LISTO!' : (mine.includes(i) ? (TOUCH ? 'Toca otra vez para confirmar' : 'Elige y confirma') : 'Eligiendo…');

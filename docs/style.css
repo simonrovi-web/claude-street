@@ -131,6 +131,10 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 6px; border-radius: 4
 .sel-info .sp span { color: #cbb8a6; }
 @media (max-height: 500px) { .sel-info .sp span { display: none; } .meter { height: 6px; } }
 
+#trainInfo { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: rgba(14,10,9,.72); border: 1px solid rgba(246,239,230,.15); font-size: 13px; color: #e8dccf; white-space: nowrap; cursor: pointer; }
+#trainInfo b { color: var(--gold); }
+@media (max-height: 500px) { #trainInfo { top: 64px; font-size: 12px; } }
+
 /* ---------- online ---------- */
 .hint.top { margin: 0 0 20px; }
 .label { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #d9b89a; font-weight: 600; }

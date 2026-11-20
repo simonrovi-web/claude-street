@@ -216,7 +216,7 @@ export class Music {
 export function themeFor(phase) {
   switch (phase) {
     case 'select': return 'seleccion';
-    case 'intro': case 'fight': case 'ko': case 'roundEnd': case 'paused': return 'combate';
+    case 'intro': case 'fight': case 'ko': case 'roundEnd': case 'paused': case 'finishWait': case 'finish': return 'combate';
     case 'matchEnd': return 'victoria';
     default: return 'menu';
   }

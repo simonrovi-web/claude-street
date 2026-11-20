@@ -6,7 +6,14 @@ import * as THREE from 'three';
 // stats: power = daño, speed = velocidad al moverse, weight = resistencia al empuje
 export const ROSTER = [
   {
-    id: 'kaito', special: { move: 'sp_dragon', name: 'Puño del Dragón', desc: 'Gancho ascendente que lanza al rival por los aires' }, name: 'KAITO', title: 'El Puño Carmesí', origin: 'Karate tradicional',
+    id: 'kaito', 
+    style: {
+      idle: 'steady',
+      stance: {},
+      intro: { hy: 0, sy: 0, y: 0, sx: 0.05, lsx: -1.25, lsz: -0.45, lex: -1.75, rsx: -1.25, rsz: 0.45, rex: -1.75, lhx: -0.15, rhx: 0.15, lkx: 0.1, rkx: 0.1 },
+      victory: { hy: 0, sy: 0, y: 0, sx: 0.85, hd: 0.35, lsx: 0.1, lsz: 0.08, lex: -0.15, rsx: 0.1, rsz: -0.08, rex: -0.15, lhx: 0, rhx: 0, lkx: 0.05, rkx: 0.05, lhz: 0.04, rhz: -0.04 },
+    },
+    special: { move: 'sp_dragon', name: 'Puño del Dragón', desc: 'Gancho ascendente que lanza al rival por los aires' }, name: 'KAITO', title: 'El Puño Carmesí', origin: 'Karate tradicional',
     stats: { power: 1.0, speed: 1.0, weight: 1.0 },
     build: { g: 1.0, m: 0.7, scale: 1.0 }, skin: 0xd29a72,
     look: { top: 'gi', topColor: 0x9e1b15, trim: 0x1a1210, pants: 0x8c1812, belt: 0x111111,
@@ -15,7 +22,14 @@ export const ROSTER = [
     alt: { topColor: 0xeee8dc, pants: 0xe2dccf, trim: 0x7a1510, accent: 0x9e1b15 },
   },
   {
-    id: 'rina', special: { move: 'sp_storm', name: 'Tormenta', desc: 'Avanza con tres patadas seguidas; la última derriba' }, name: 'RINA', title: 'Tormenta Azul', origin: 'Kickboxing callejero', female: true,
+    id: 'rina', 
+    style: {
+      idle: 'bounce',
+      stance: { y: -0.04, sx: 0.1, lsx: -1.3, lex: -2.1, rsx: -1.1, rex: -2.3 },
+      intro: { hy: -0.2, y: -0.02, lsx: -1.6, lex: -0.1, lsz: 0.1, rsx: -1.0, rex: -2.3, sy: -0.2 },
+      victory: null,
+    },
+    special: { move: 'sp_storm', name: 'Tormenta', desc: 'Avanza con tres patadas seguidas; la última derriba' }, name: 'RINA', title: 'Tormenta Azul', origin: 'Kickboxing callejero', female: true,
     stats: { power: 0.9, speed: 1.15, weight: 0.88 },
     build: { g: 0.86, m: 0.45, scale: 0.97 }, skin: 0xe9b995,
     look: { top: 'vest', topColor: 0x1f4fb8, trim: 0xd8dde6, pants: 0x14234f, belt: 0xd8dde6,
@@ -24,7 +38,14 @@ export const ROSTER = [
     alt: { topColor: 0xc8901a, pants: 0x2e2210, trim: 0x1a1a1a, belt: 0x1a1a1a, handColor: 0x1a1a1a, accent: 0x1a1a1a },
   },
   {
-    id: 'voss', special: { move: 'sp_quake', name: 'Martillo Sísmico', desc: 'Golpe al suelo con onda expansiva baja y de largo alcance' }, name: 'VOSS', title: 'El Martillo de Hierro', origin: 'Gladiador de las fosas',
+    id: 'voss', 
+    style: {
+      idle: 'heavy',
+      stance: { y: -0.12, sx: 0.12, lhz: 0.14, rhz: -0.14, lhx: -0.25, rhx: 0.2, lsx: -0.8, lsz: 0.3, lex: -1.5, rsx: -0.6, rsz: -0.35, rex: -1.7 },
+      intro: { hy: 0, sy: 0, y: -0.08, sx: 0.2, lsx: -1.3, lsz: -0.35, lex: -1.6, rsx: -1.3, rsz: 0.35, rex: -1.6, lhz: 0.14, rhz: -0.14 },
+      victory: { hy: 0, sy: 0, y: 0, sx: -0.08, hd: -0.2, lsx: -0.3, lsz: 1.4, lex: -2.1, rsx: -0.3, rsz: -1.4, rex: -2.1, lhz: 0.13, rhz: -0.13, lhx: 0, rhx: 0, lkx: 0.08, rkx: 0.08 },
+    },
+    special: { move: 'sp_quake', name: 'Martillo Sísmico', desc: 'Golpe al suelo con onda expansiva baja y de largo alcance' }, name: 'VOSS', title: 'El Martillo de Hierro', origin: 'Gladiador de las fosas',
     stats: { power: 1.25, speed: 0.85, weight: 1.35 },
     build: { g: 1.3, m: 1.0, scale: 1.07 }, skin: 0xc28766,
     look: { top: 'armor', topColor: 0x3b2618, pants: 0x2a221c, belt: 0x4e3018, metal: 0x7d838b,
@@ -33,7 +54,14 @@ export const ROSTER = [
     alt: { metal: 0xa8833a, topColor: 0x4a1612, pants: 0x1e1612 },
   },
   {
-    id: 'nyx', special: { move: 'sp_shadow', name: 'Paso Sombra', desc: 'Desaparece y ataca por la espalda' }, name: 'NYX', title: 'Sombra sin Rostro', origin: 'Hermandad de la Ceniza',
+    id: 'nyx', 
+    style: {
+      idle: 'sway',
+      stance: { y: -0.16, sx: 0.28, lsx: -1.0, lex: -1.0, lsz: 0.2, rsx: -0.4, rex: -1.5, rsz: -0.3, lhx: -0.5, lkx: 0.8, rhx: 0.4, rkx: 0.6 },
+      intro: { y: -0.42, sx: 0.55, hd: 0.2, lsx: 0.4, rsx: 0.4, lsz: 0.4, rsz: -0.4, lex: -0.4, rex: -0.4, lhx: -1.05, lkx: 1.8, rhx: -0.7, rkx: 1.7 },
+      victory: { hy: 0, sy: 0, y: 0, sx: 0, hd: 0.15, lsx: -1.25, lsz: -0.55, lex: -1.9, rsx: -1.15, rsz: 0.55, rex: -1.9, lhx: 0, rhx: 0, lkx: 0.02, rkx: 0.02 },
+    },
+    special: { move: 'sp_shadow', name: 'Paso Sombra', desc: 'Desaparece y ataca por la espalda' }, name: 'NYX', title: 'Sombra sin Rostro', origin: 'Hermandad de la Ceniza',
     stats: { power: 0.95, speed: 1.2, weight: 0.9 },
     build: { g: 0.92, m: 0.55, scale: 1.0 }, skin: 0xa9806a,
     look: { top: 'wraps', topColor: 0x1d1622, trim: 0x5d2a78, pants: 0x18121e, belt: 0x5d2a78, metal: 0x5d646d,
@@ -42,7 +70,14 @@ export const ROSTER = [
     alt: { topColor: 0x262626, trim: 0x8e1414, belt: 0x8e1414, glow: 0xff5030 },
   },
   {
-    id: 'torak', special: { move: 'sp_charge', name: 'Embestida', desc: 'Carga con el hombro que arrastra al rival hacia el borde' }, name: 'TORAK', title: 'Furia de las Montañas', origin: 'Guerrero tribal',
+    id: 'torak', 
+    style: {
+      idle: 'heavy',
+      stance: { y: -0.1, sx: 0.18, lsx: -0.9, lsz: 0.35, rsx: -0.7, rsz: -0.35 },
+      intro: { hy: 0, sy: 0, sx: -0.1, hd: -0.2, lsx: -1.0, lsz: -0.2, lex: -2.4, rsx: -1.0, rsz: 0.2, rex: -2.4 },
+      victory: { hy: 0, sy: 0, y: 0, sx: -0.25, hd: -0.5, lsx: -2.6, lsz: 0.7, lex: -0.6, rsx: -2.6, rsz: -0.7, rex: -0.6, lhz: 0.12, rhz: -0.12, lhx: 0, rhx: 0, lkx: 0.1, rkx: 0.1 },
+    },
+    special: { move: 'sp_charge', name: 'Embestida', desc: 'Carga con el hombro que arrastra al rival hacia el borde' }, name: 'TORAK', title: 'Furia de las Montañas', origin: 'Guerrero tribal',
     stats: { power: 1.15, speed: 1.0, weight: 1.15 },
     build: { g: 1.16, m: 1.0, scale: 1.04 }, skin: 0x8e5a3c,
     look: { top: 'bare', pants: 0x3e2818, belt: 0x22160c, hands: 'wraps', handColor: 0x8a7858,
@@ -51,7 +86,14 @@ export const ROSTER = [
     alt: { paint: 0x1f6fd0, pants: 0x283624, fur: 0x9a9a92 },
   },
   {
-    id: 'sera', special: { move: 'sp_lotus', name: 'Palma del Loto', desc: 'Lanza una esfera de energía a distancia' }, name: 'SERA', title: 'Loto Dorado', origin: 'Monasterio de la Cumbre', female: true,
+    id: 'sera', 
+    style: {
+      idle: 'flow',
+      stance: { y: -0.08, sx: 0.05, lsx: -1.2, lex: -1.1, rsx: -0.6, rex: -1.6 },
+      intro: { hy: 0, sy: 0, y: 0, lhx: -1.3, lkx: 1.9, rhx: 0, rkx: 0.05, lsx: -2.6, lsz: 0.5, lex: -0.5, rsx: -1.4, rsz: -0.2, rex: -0.2 },
+      victory: { hy: 0, sy: 0, y: 0, sx: 0.15, hd: 0.2, lsx: -1.0, lsz: -0.35, lex: -2.0, rsx: -1.0, rsz: 0.35, rex: -2.0, lhx: 0, rhx: 0, lkx: 0.02, rkx: 0.02 },
+    },
+    special: { move: 'sp_lotus', name: 'Palma del Loto', desc: 'Lanza una esfera de energía a distancia' }, name: 'SERA', title: 'Loto Dorado', origin: 'Monasterio de la Cumbre', female: true,
     stats: { power: 1.0, speed: 1.08, weight: 0.95 },
     build: { g: 0.88, m: 0.4, scale: 0.98 }, skin: 0xdfa983,
     look: { top: 'robe', topColor: 0xe9e1d0, trim: 0xc99a1e, pants: 0xd2c9b6, belt: 0xc99a1e,
