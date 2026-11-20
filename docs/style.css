@@ -65,6 +65,7 @@ button.primary:hover { background: #9e1f16; }
 button:disabled { opacity: .5; pointer-events: none; }
 button.ghost { border-color: rgba(246,239,230,.35); padding: 10px 18px; font-size: 13px; margin-top: 16px; }
 button.online { border-color: var(--gold); color: var(--gold); }
+button.ghost-inline { border-color: rgba(246,239,230,.3); font-size: 13px; padding: 10px 16px; }
 .controls { margin-top: 24px; font-size: 14px; }
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 8px; }

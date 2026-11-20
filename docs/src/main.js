@@ -4,6 +4,7 @@ import { Input, RemoteInput, toFighterInput, NO_INPUT, toMask, setupTouch } from
 import { ATTACKS, STANCE, over } from './poses.js';
 import { ROSTER } from './characters.js';
 import { Sfx } from './audio.js';
+import { Music, themeFor } from './music.js';
 import { AI } from './ai.js';
 import { Net, cleanCode } from './net.js';
 import { setupEnvironment, loadArena, loadCrowd, updateCrowd, FX } from './arena.js';
@@ -39,6 +40,7 @@ resize();
 const env = setupEnvironment(scene, TOUCH ? 1024 : 2048, renderer);
 const fx = new FX(scene);
 const sfx = new Sfx();
+const music = new Music(sfx);
 const input = new Input();
 const remote = new RemoteInput();
 const net = new Net();
@@ -546,8 +548,21 @@ function reselect() {
 $('#reselect').addEventListener('click', reselect);
 function setEndStatus(t) { $('#endStatus').textContent = t; }
 $('#rematch').addEventListener('click', rematch);
+// el audio del navegador solo arranca tras un gesto del usuario
+const unlockAudio = () => sfx.init();
+addEventListener('pointerdown', unlockAudio, { capture: true });
+addEventListener('keydown', unlockAudio, { capture: true });
+function toggleMusic() {
+  const on = music.toggle();
+  document.querySelectorAll('.musicBtn').forEach((b) => { b.textContent = on ? 'Música: sí' : 'Música: no'; });
+}
+document.querySelectorAll('.musicBtn').forEach((b) => {
+  b.textContent = music.enabled ? 'Música: sí' : 'Música: no';
+  b.addEventListener('click', toggleMusic);
+});
 addEventListener('keydown', (e) => {
   if (e.target && e.target.tagName === 'INPUT') return;
+  if (e.code === 'KeyM') toggleMusic();
   if (e.code === 'Escape') togglePause();
   if (e.code === 'Enter') {
     if (G.phase === 'menu' && !menu.classList.contains('hidden')) startMatch(TOUCH ? 'cpu' : '2p');
@@ -745,6 +760,9 @@ function frame(now) {
     arena.fires.forEach((f, i) => { f.scale.set(1 + Math.sin(t * 17 + i) * 0.1, 1.4 + Math.sin(t * 11 + i * 3) * 0.25, 1 + Math.cos(t * 15 + i) * 0.1); });
   }
   const paused = G.phase === 'paused';
+  // música según la fase (el invitado online la sigue por la fase que recibe)
+  music.play(themeFor(G.phase));
+  music.setLevel(paused ? 0.35 : G.phase === 'ko' ? 0.55 : 1);
   if (G.crowd) { updateCrowd(G.crowd, paused ? 0 : dt); sfx.crowd(G.crowd.excite); }
   fighters.forEach((f) => f.render(paused ? 0 : dt));
   fx.update(paused ? 0 : dt);
@@ -759,6 +777,7 @@ function frame(now) {
   try {
     arena = await loadArena(scene);
     G.crowd = await loadCrowd(scene, 'assets/', TOUCH ? 0.6 : 1);
+    music.load('assets/musica.json').catch((e) => console.warn('Sin música', e));
     makePortraits();
   } catch (err) {
     console.error(err);
@@ -785,6 +804,6 @@ requestAnimationFrame(frame);
 
 // para depurar desde la consola
 window.__game = {
-  G, fighters, startMatch, beginMatch, sel: () => sel, input, net,
+  G, fighters, startMatch, beginMatch, sel: () => sel, input, net, music,
   advance(n = 1) { for (let i = 0; i < n; i++) { step(); fighters.forEach((f) => f.render(STEP)); fx.update(STEP); } },
 };

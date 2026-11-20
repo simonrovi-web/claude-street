@@ -23,6 +23,15 @@ Antes de cada combate se elige luchador. Si los dos eligen el mismo, el segundo 
 
 Selección: J1 con `A` `D` `W` `S` y `F` para confirmar (`G` para cambiar); J2 con las flechas y `K` (`L` para cambiar). Con ratón o pantalla táctil, toca un luchador y vuelve a tocarlo para confirmar.
 
+## Música
+
+Cuatro temas originales en Re menor a 140 BPM, compuestos en Ableton Live: **Menú** (épico y pausado), **Selección** (arpegios), **Combate** (16 compases, agresivo) y **Victoria** (fanfarria). Cada uno tiene melodía, bajo, acordes y batería.
+
+- En Ableton están en la vista Session: una escena por tema y las pistas *Melodía*, *Bajo*, *Acordes* y *Batería*.
+- Las notas están en `docs/assets/musica.json` y el juego las toca con sintetizadores propios (Web Audio), así que no hay archivos de audio que descargar.
+- `tools/componer.py` es el script que genera las notas: si cambias la composición, vuelve a ejecutarlo para actualizar el JSON.
+- `M` activa o quita la música (también hay un botón en el menú y en la pausa).
+
 ## Jugar con dos móviles
 
 1. Los dos abrís el enlace de arriba en el navegador del móvil y lo ponéis en horizontal.
@@ -90,6 +99,9 @@ docs/                  juego web (publicado con GitHub Pages)
   src/net.js           conexión online entre dos navegadores (PeerJS)
   src/ai.js            CPU
   src/audio.js         sonidos sintetizados
+  src/music.js         reproductor de la música compuesta en Ableton
+  assets/musica.json   notas de los 4 temas
+tools/componer.py      composición de la música (genera musica.json)
 ```
 
 Para cambiar la arena: edítala en Blender y vuelve a exportar `Arena_Ring`, `Arena_Entorno` y `Arena_Galeria` (sin el objeto `Publico`) a `docs/assets/arena.glb`.
