@@ -80,9 +80,9 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 6px; border-radius: 4
 #select { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(to bottom, rgba(10,6,5,.55), transparent 22%, transparent 55%, rgba(10,6,5,.85)); }
 #select > * { pointer-events: auto; }
 .sel-title { position: absolute; top: 14px; left: 0; right: 0; text-align: center; margin: 0; font-size: clamp(30px, 5vw, 54px); text-shadow: 0 3px 0 #000; pointer-events: none !important; }
-.sel-info { position: absolute; top: clamp(56px, 11vh, 90px); width: min(30vw, 300px); padding: 12px 14px; background: rgba(14,10,9,.72); border-left: 4px solid #e0392b; border-radius: 4px; }
+.sel-info { position: absolute; top: clamp(56px, 11vh, 90px); width: min(30vw, 300px); padding: 12px 14px; background: rgba(14,10,9,.72); border: 1px solid rgba(246,239,230,.12); border-radius: 6px; }
 .sel-info.p1 { left: 18px; }
-.sel-info.p2 { right: 18px; border-left: 0; border-right: 4px solid #2f6fe8; text-align: right; }
+.sel-info.p2 { right: 18px; text-align: right; }
 .sel-info .who { font: 800 12px 'Barlow', sans-serif; letter-spacing: 2px; color: #ffb3a8; }
 .sel-info.p2 .who { color: #a9c6ff; }
 .sel-info .nm { font-family: 'Bebas Neue', sans-serif; font-size: clamp(34px, 5vw, 56px); line-height: .95; letter-spacing: 2px; }
