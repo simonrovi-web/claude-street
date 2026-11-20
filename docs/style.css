@@ -123,12 +123,9 @@ kbd { display: inline-block; min-width: 24px; padding: 2px 6px; border-radius: 4
 .p1 .meter i { right: 0; }
 .p2 .meter i { left: 0; }
 .meter::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: rgba(246,239,230,.6); }
-.meter span { position: absolute; top: -1px; font: 800 7px 'Barlow', sans-serif; letter-spacing: 1px; color: #fff; opacity: 0; }
-.p1 .meter span { right: 4px; } .p2 .meter span { left: 4px; }
 .meter.ready i { background: linear-gradient(90deg, #f2c14e, #ffe08a); }
-.meter.ready span { opacity: .9; color: #1a1210; }
 .meter.full i { animation: blink .4s infinite alternate; }
-.tb.sp { background: rgba(140,90,10,.85); grid-column: 1; grid-row: 1; border-radius: 14px; height: 70%; align-self: end; font-size: min(2.2vmin, 10px); }
+.tb.sp { background: rgba(140,90,10,.85); grid-column: 1; grid-row: 1; border-radius: 14px; height: 70%; align-self: end; font-size: 11px; }
 .sel-info .sp { font-size: 12px; color: #e8dccf; margin-top: 8px; line-height: 1.35; }
 .sel-info .sp b { color: var(--gold); font-weight: 800; }
 .sel-info .sp span { color: #cbb8a6; }
@@ -151,13 +148,13 @@ body.touch .mob { display: block; }
 #stick { position: absolute; left: calc(18px + env(safe-area-inset-left)); bottom: calc(18px + env(safe-area-inset-bottom)); width: min(36vmin, 170px); aspect-ratio: 1; border-radius: 50%; background: rgba(20,14,12,.35); border: 2px solid rgba(246,239,230,.35); pointer-events: auto; display: grid; place-items: center; }
 #stick .knob { width: 42%; aspect-ratio: 1; border-radius: 50%; background: rgba(246,239,230,.85); box-shadow: 0 3px 0 rgba(0,0,0,.4); }
 .tbtns { position: absolute; right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(3, min(17vmin, 78px)); grid-template-rows: repeat(2, min(17vmin, 78px)); gap: 10px; pointer-events: auto; }
-.tb { padding: 0; border-radius: 50%; font: 800 min(2.6vmin, 12px) 'Barlow', sans-serif; letter-spacing: .5px; color: #fff; border: 2px solid rgba(255,255,255,.5); background: rgba(20,14,12,.45); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+.tb { padding: 0 6px; border-radius: 50%; font: 800 11px 'Barlow', sans-serif; letter-spacing: .5px; color: #fff; border: 2px solid rgba(255,255,255,.5); background: rgba(20,14,12,.45); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
 .tb:hover { transform: none; }
 .tb.on { transform: translateY(3px) scale(.95); box-shadow: 0 1px 0 rgba(0,0,0,.35); filter: brightness(1.25); }
 .tb.p { background: rgba(179,36,26,.8); grid-column: 2; grid-row: 2; }
 .tb.k { background: rgba(31,74,170,.82); grid-column: 3; grid-row: 2; }
 .tb.g { background: rgba(120,98,30,.85); grid-column: 1; grid-row: 2; }
-.tb.side { border-radius: 14px; height: 70%; align-self: end; font-size: min(2.3vmin, 11px); }
+.tb.side { border-radius: 14px; height: 70%; align-self: end; font-size: 11px; }
 .tb[data-a="sideIn"] { grid-column: 2; grid-row: 1; }
 .tb[data-a="sideOut"] { grid-column: 3; grid-row: 1; }
 .tpause { position: absolute; top: calc(70px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 13px; background: rgba(20,14,12,.45); border-color: rgba(246,239,230,.4); pointer-events: auto; }
