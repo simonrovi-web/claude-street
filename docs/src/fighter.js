@@ -30,7 +30,7 @@ export class Fighter {
     scene.add(this.root);
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
-    this.time = Math.random() * 100;
+    this.time = index * 37;
     this.wins = 0;
     this.reset(0, 0);
   }
@@ -159,6 +159,7 @@ export class Fighter {
     this.state = 'idle';
     this.f = 0;
     this.facing = facing;
+    this.lastFacing = facing;
     this.pose = P(STANCE);
     this.attack = null;
     this.flash = 0;
@@ -314,7 +315,6 @@ export class Fighter {
 
   // ------------------------------------------------------------ actualización por frame
   update(inp, opp, G) {
-    this.time++;
     this.f++;
     if (this.flash > 0) this.flash--;
 
@@ -376,8 +376,7 @@ export class Fighter {
         case 'throwing':
           if (this.f >= 50) {
             // el rival quedó detrás: giramos y compensamos la pose
-            this.facing += Math.PI;
-            this.pose.hy -= Math.PI;
+            this.facing += Math.PI; // render() compensa la pose para que no gire de golpe
             this.toIdle();
           }
           break;
@@ -532,6 +531,16 @@ export class Fighter {
   }
 
   render(dt) {
+    this.time += dt * 60;
+    // si la orientación cambia de golpe (tras un lanzamiento), giramos la cadera al revés
+    // para que el cuerpo no salte y se recoloque suavemente
+    const d = wrap(this.facing - this.lastFacing);
+    if (Math.abs(d) > 0.6) this.pose.hy -= d;
+    this.lastFacing = this.facing;
+    if (this.state !== 'attack' && this.state !== 'throwing') {
+      if (this.pose.hy > Math.PI) this.pose.hy -= Math.PI * 2;
+      else if (this.pose.hy < -Math.PI * 1.5) this.pose.hy += Math.PI * 2;
+    }
     const target = this.targetPose();
     const k = this.state === 'attack' ? 0.6 : (this.state === 'hitstun' || this.state === 'blockstun') ? 0.6
       : (this.state === 'knockdown' || this.state === 'thrown') ? 0.2 : 0.3;

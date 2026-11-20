@@ -2,13 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1210">
   <title>Claude Street · Arena</title>
-  <meta name="description" content="Juego de pelea 3D para dos jugadores en el navegador.">
+  <meta name="description" content="Juego de pelea 3D para dos jugadores en el navegador, en el mismo teclado o online con dos móviles.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script type="importmap">
     {
       "imports": {
@@ -39,15 +43,31 @@
   <div id="sub"></div>
   <div id="pop"></div>
 
+  <!-- controles táctiles -->
+  <div id="touch" class="hidden">
+    <div id="stick"><div class="knob"></div></div>
+    <button id="btnPause" class="tpause" aria-label="Pausa">II</button>
+    <div class="tbtns">
+      <button data-a="sideIn" class="tb side">FONDO</button>
+      <button data-a="sideOut" class="tb side">FRENTE</button>
+      <button data-a="guard" class="tb g">GUARDIA</button>
+      <button data-a="punch" class="tb p">PUÑO</button>
+      <button data-a="kick" class="tb k">PATADA</button>
+    </div>
+  </div>
+
+  <div id="rotate">Gira el móvil para jugar mejor</div>
+
   <div id="menu" class="overlay hidden">
     <div class="panel">
       <h1>CLAUDE <span>STREET</span></h1>
       <p class="tag">Torneo de la Arena de Piedra</p>
       <div class="buttons">
-        <button data-mode="2p" class="primary">2 Jugadores</button>
+        <button data-mode="2p" class="primary desk">2 Jugadores</button>
+        <button id="btnOnline" class="online">Online · 2 móviles</button>
         <button data-mode="cpu">1 Jugador vs CPU</button>
       </div>
-      <div class="controls">
+      <div class="controls desk">
         <table>
           <thead><tr><th></th><th class="c1">Jugador 1 · Kaito</th><th class="c2">Jugador 2 · Rina</th></tr></thead>
           <tbody>
@@ -59,6 +79,9 @@
             <tr><td>Guardia</td><td><kbd>H</kbd></td><td><kbd>Ñ</kbd></td></tr>
           </tbody>
         </table>
+      </div>
+      <div class="controls">
+        <p class="mob hint">Joystick a la izquierda para moverte (arriba salta, abajo agacha). Botones de puño, patada, guardia y esquiva a la derecha.</p>
         <ul class="moves">
           <li><b>Puño, Puño, Patada</b> combo con patada giratoria</li>
           <li><b>Adelante + Puño</b> codazo (medio)</li>
@@ -67,8 +90,31 @@
           <li><b>Guardia + Puño</b> de cerca: agarre y lanzamiento por detrás</li>
           <li><b>Guardia</b> al ser agarrado: escapar del agarre</li>
         </ul>
-        <p class="hint">Los golpes <b>altos</b> se esquivan agachándose; los <b>bajos</b> se bloquean agachado con guardia. Gana 2 rondas. Saca al rival del ring y ganas la ronda al instante. También funciona con mandos. <kbd>Esc</kbd> pausa.</p>
+        <p class="hint">Los golpes <b>altos</b> se esquivan agachándose; los <b>bajos</b> se bloquean agachado con guardia. Gana 2 rondas. Saca al rival del ring y ganas la ronda al instante.<span class="desk"> También funciona con mandos. <kbd>Esc</kbd> pausa.</span></p>
       </div>
+    </div>
+  </div>
+
+  <div id="online" class="overlay hidden">
+    <div class="panel small">
+      <h2>ONLINE</h2>
+      <p class="hint top">Cada jugador en su móvil (o en su ordenador). Uno crea la sala y el otro se une con el código.</p>
+      <div id="onChoose" class="buttons">
+        <button id="btnHost" class="primary">Crear sala</button>
+        <button id="btnJoin">Unirme a una sala</button>
+      </div>
+      <div id="onHost" class="hidden">
+        <p class="label">Código de sala · juegas con Kaito</p>
+        <div id="roomCode" class="code">····</div>
+        <button id="shareLink" class="ghost">Enviar invitación</button>
+      </div>
+      <div id="onJoin" class="hidden">
+        <p class="label">Código de sala · juegas con Rina</p>
+        <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" aria-label="Código de sala">
+        <div class="buttons"><button id="btnConnect" class="primary">Conectar</button></div>
+      </div>
+      <p id="onStatus" class="status" role="status"></p>
+      <button class="toMenu ghost">Volver</button>
     </div>
   </div>
 
@@ -89,6 +135,7 @@
         <button id="rematch" class="primary">Revancha</button>
         <button class="toMenu">Menú principal</button>
       </div>
+      <p id="endStatus" class="status"></p>
     </div>
   </div>
 

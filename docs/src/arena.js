@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RING_TOP } from './fighter.js';
 
 // ---------------------------------------------------------------- cielo y luces
-export function setupEnvironment(scene) {
+export function setupEnvironment(scene, shadowSize = 2048) {
   const skyGeo = new THREE.SphereGeometry(400, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
@@ -21,7 +21,7 @@ export function setupEnvironment(scene) {
   const sun = new THREE.DirectionalLight(0xffe2c4, 2.4);
   sun.position.set(9, 15, 11);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(shadowSize, shadowSize);
   const s = sun.shadow.camera;
   s.left = -9; s.right = 9; s.top = 9; s.bottom = -9; s.near = 1; s.far = 50;
   sun.shadow.bias = -0.0004;
@@ -133,7 +133,7 @@ export async function loadArena(scene, base = 'assets/') {
 const CLOTHES = [0xb3141a, 0x1d3f9a, 0xe6bf1a, 0x1f7a33, 0xe8e6dc, 0x1a1a1a, 0x7c1c86, 0xf06a10, 0x2aa0b4, 0x5a3b22, 0xd94f8a, 0x8fbf3a];
 const SKIN = [0xf2c4a0, 0xd9a07a, 0xa8714a, 0x7a4a2c, 0x4a2c1a];
 
-export async function loadCrowd(scene, base = 'assets/') {
+export async function loadCrowd(scene, base = 'assets/', density = 1) {
   const data = await fetch(base + 'asientos.json').then((r) => r.json());
   const seats = data.seats;
   const N = seats.length;
@@ -157,7 +157,7 @@ export async function loadCrowd(scene, base = 'assets/') {
       s: 0.9 + Math.random() * 0.22,
       ph: Math.random() * Math.PI * 2, sp: 0.08 + Math.random() * 0.08,
       fan: Math.random(), // umbral de emoción para levantar los brazos
-      hidden: Math.random() > 0.88, // asientos vacíos
+      hidden: Math.random() > 0.88 * density, // asientos vacíos (menos público en móvil)
     });
     const clothes = CLOTHES[(Math.random() * CLOTHES.length) | 0];
     mBody.setColorAt(i, col.setHex(clothes));

@@ -1,12 +1,23 @@
 # Claude Street
 
-Juego de pelea 3D para **dos jugadores en el mismo teclado** (o con mandos), al estilo de los clásicos de ring cuadrado: combates a 2 rondas, golpes altos/medios/bajos, esquivas laterales, agarres y **ring out**.
+Juego de pelea 3D para **dos jugadores en el mismo teclado**, con mandos, u **online con dos móviles**, al estilo de los clásicos de ring cuadrado: combates a 2 rondas, golpes altos/medios/bajos, esquivas laterales, agarres y **ring out**.
 
 La arena (ring, estanque, antorchas, gradas y público) está modelada en Blender (`Arena_Pelea.blend`) y exportada a glTF. El juego corre en el navegador con [Three.js](https://threejs.org/), sin instalar nada.
 
 **Jugar:** https://simonrovi-web.github.io/claude-street/
 
-## Controles
+## Jugar con dos móviles
+
+1. Los dos abrís el enlace de arriba en el navegador del móvil y lo ponéis en horizontal.
+2. Uno pulsa **Online · 2 móviles → Crear sala**. Le sale un código de 4 letras (o puede pulsar *Enviar invitación* para mandar un enlace por WhatsApp, etc.).
+3. El otro pulsa **Online · 2 móviles → Unirme a una sala** y escribe el código (o abre el enlace de invitación).
+4. El combate empieza solo. Quien crea la sala juega con Kaito; quien se une, con Rina.
+
+Controles táctiles: joystick a la izquierda (arriba salta, abajo agacha) y botones de puño, patada, guardia y esquiva (fondo/frente) a la derecha. También funciona entre dos ordenadores, o un móvil y un ordenador.
+
+Cómo funciona: los móviles se conectan directamente entre sí con WebRTC ([PeerJS](https://peerjs.com/)); el servidor público de PeerJS solo se usa para encontrarse con el código. El móvil que crea la sala simula el combate y el otro envía sus controles y recibe lo que pasa. En la misma WiFi va mejor; con datos móviles algunas operadoras bloquean las conexiones directas y puede no conectar.
+
+## Controles de teclado
 
 | Acción | Jugador 1 (Kaito) | Jugador 2 (Rina) |
 |---|---|---|
@@ -57,7 +68,8 @@ docs/                  juego web (publicado con GitHub Pages)
   src/fighter.js       luchador: modelo, estados, física y golpes
   src/poses.js         poses y tabla de ataques (frames, daño, alcance)
   src/arena.js         carga de la arena, público, luces y partículas
-  src/input.js         teclado y mandos
+  src/input.js         teclado, mandos y controles táctiles
+  src/net.js           conexión online entre dos navegadores (PeerJS)
   src/ai.js            CPU
   src/audio.js         sonidos sintetizados
 ```
