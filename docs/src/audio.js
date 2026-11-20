@@ -64,6 +64,15 @@ export class Sfx {
     this.noise(1.2, { type: 'lowpass', freq: 3000, freqEnd: 300, gain: 0.8, attack: 0.01 });
     this.tone(120, 40, 0.4, { gain: 0.6 });
   }
+  special() {
+    this.tone(220, 880, 0.35, { type: 'sawtooth', gain: 0.18 });
+    this.tone(330, 1320, 0.35, { type: 'square', gain: 0.08 });
+    this.noise(0.4, { type: 'bandpass', freq: 600, freqEnd: 4000, q: 1, gain: 0.3, attack: 0.05 });
+  }
+  zap() {
+    this.tone(900, 300, 0.25, { type: 'sine', gain: 0.25 });
+    this.noise(0.2, { type: 'highpass', freq: 3000, gain: 0.15 });
+  }
   bell() {
     [0, 0.25].forEach((d) => setTimeout(() => {
       this.tone(1250, 1240, 0.9, { type: 'sine', gain: 0.25 });

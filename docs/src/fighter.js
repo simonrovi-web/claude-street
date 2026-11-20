@@ -14,6 +14,7 @@ const WATER = 0.02;
 const GRAV = 0.0095;
 const WALK_F = 0.042, WALK_B = 0.032;
 export const MAX_HP = 200;
+export const SPECIAL_COST = 50;   // la barra de energía llega a 100
 
 const ACTIONABLE = new Set(['idle', 'walk', 'crouch', 'guard', 'crouchGuard']);
 const INVULN = new Set(['knockdown', 'ko', 'getup', 'ringout', 'thrown', 'victory']);
@@ -90,6 +91,7 @@ export class Fighter {
     this.dead = false;
     this.stun = 0;
     this.thrower = null;
+    if (this.meter === undefined) this.meter = 0;
     this.root.visible = true;
   }
 
@@ -133,9 +135,20 @@ export class Fighter {
     this.attackName = name;
     this.attackFwd = this.fwd();
     this.hasHit = false;
+    this.hitWin = -1;
     this.buf = null;
     this.setState('attack');
-    G.sfx.whoosh(this.attack.heavy);
+    if (this.attack.special) {
+      this.meter = Math.max(0, this.meter - SPECIAL_COST);
+      G.onSpecial(this);
+    } else G.sfx.whoosh(this.attack.heavy);
+  }
+
+  canSpecial() { return this.meter >= SPECIAL_COST; }
+  trySpecial(G) {
+    if (!this.canSpecial()) return false;
+    this.startAttack(this.def.special.move, G);
+    return true;
   }
 
   startJump(inp) {
@@ -209,8 +222,8 @@ export class Fighter {
       this.dead = true;
       this.knockdown(dir, push + 0.06, 0.1);
       G.onKO(this);
-    } else if (A.knockdown || this.isAirborne()) {
-      this.knockdown(dir, push, 0.08);
+    } else if (A.knockdown || this.isAirborne() || (A.knockdownLast && att && att.hitWin === A.hits.length - 1)) {
+      this.knockdown(dir, push, A.launch || 0.08);
     } else {
       this.hitLevel = wasCrouching ? 'crouch' : A.level;
       this.stun = A.hs + (counter ? 4 : 0);
@@ -247,7 +260,9 @@ export class Fighter {
       const held = inp.held, pr = inp.pressed;
       const down = held.down;
       const throwInput = (pr.punch && (held.guard || inp.recent.guard < 4)) || (pr.guard && inp.recent.punch < 4);
-      if (throwInput && !down) this.tryThrow(opp, G);
+      const specialInput = pr.special || (pr.punch && inp.recent.kick < 3) || (pr.kick && inp.recent.punch < 3);
+      if (specialInput && this.trySpecial(G)) { /* especial */ }
+      else if (throwInput && !down) this.tryThrow(opp, G);
       else if (pr.punch) this.startAttack(down ? 'lowPunch' : held.fwd ? 'elbow' : 'jab', G);
       else if (pr.kick) this.startAttack(down ? 'sweep' : held.fwd ? 'pushKick' : 'kick', G);
       else if (pr.up && !down) this.startJump(inp);
@@ -315,7 +330,23 @@ export class Fighter {
     const A = this.attack, f = this.f;
     if (A.lunge && f <= A.s) this.pos.addScaledVector(this.attackFwd, A.lunge);
     if (this.attackName === 'jab' && f <= 3 && inp.pressed.guard) { this.tryThrow(opp, G); return; }
-    if (A.a > 0 && f > A.s && f <= A.s + A.a && !this.hasHit) this.checkHit(opp, G);
+    // puño y patada casi a la vez: el golpe normal se convierte en especial
+    if (!A.special && !A.air && f <= 3 && (inp.pressed.special || (inp.pressed.kick && inp.recent.punch < 4) || (inp.pressed.punch && inp.recent.kick < 4))) {
+      if (this.trySpecial(G)) return;
+    }
+    if (A.move && f > A.move[0] && f <= A.move[1] && !(A.stopOnHit && this.hasHit)) {
+      this.pos.addScaledVector(this.attackFwd, A.move[2]);
+    }
+    if (A.teleport && f === A.teleport) this.teleportBehind(opp, G);
+    if (A.projectile && f === A.projectile.at) G.spawnProjectile(this, A);
+    if (A.slamAt && f === A.slamAt) G.onSlam(this);
+    const wins = A.hits || (A.a > 0 ? [[A.s, A.s + A.a]] : []);
+    for (let i = 0; i < wins.length; i++) {
+      if (f > wins[i][0] && f <= wins[i][1]) {
+        if (this.hitWin !== i) { this.hitWin = i; if (A.hits) this.hasHit = false; }
+        if (!this.hasHit) this.checkHit(opp, G);
+      }
+    }
     if (A.chain) {
       if (inp.pressed.punch) this.buf = 'P';
       if (inp.pressed.kick) this.buf = 'K';
@@ -327,6 +358,21 @@ export class Fighter {
     }
     if (A.air) return; // termina al aterrizar
     if (f >= A.s + A.a + A.r) this.toIdle();
+  }
+
+  teleportBehind(opp, G) {
+    const from = this.pos.clone();
+    const d = new THREE.Vector3(opp.pos.x - this.pos.x, 0, opp.pos.z - this.pos.z);
+    if (d.lengthSq() < 1e-4) d.set(1, 0, 0);
+    d.normalize();
+    this.pos.x = THREE.MathUtils.clamp(opp.pos.x + d.x * 0.85, -WALL, WALL);
+    this.pos.z = THREE.MathUtils.clamp(opp.pos.z + d.z * 0.85, -WALL, WALL);
+    this.facing = Math.atan2(opp.pos.x - this.pos.x, opp.pos.z - this.pos.z);
+    this.lastFacing = this.facing; // aparece ya girada, sin transición
+    this.attackFwd = this.fwd();
+    G.fx.smoke(from);
+    G.fx.smoke(this.pos);
+    G.sfx.whoosh(true);
   }
 
   updateThrown(inp, G) {
@@ -448,6 +494,7 @@ export class Fighter {
         [A.s + A.a + A.r * 0.7, over(STANCE, { hy: STANCE.hy + Math.PI * 2 })],
       ], f);
     }
+    if (A.keys) return samplePose(A.keys, f);
     if (A.air) return samplePose([[0, base], [A.s, A.S]], f);
     return samplePose([
       [0, base], [Math.max(1, A.s * 0.6), A.W], [A.s, A.S], [A.s + A.a, A.S], [A.s + A.a + A.r * 0.75, base],

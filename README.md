@@ -19,6 +19,19 @@ Antes de cada combate se elige luchador. Si los dos eligen el mismo, el segundo 
 | **Torak**, Furia de las Montañas | Guerrero tribal | Alto | Media | Alto |
 | **Sera**, Loto Dorado | Monja guerrera | Medio | Alta | Medio |
 
+### Golpes especiales y energía
+
+Cada luchador tiene un especial propio. Se lanza con la tecla de especial (`R` el J1, `P` el J2, `Y` en el mando, botón ESPECIAL en el móvil) o pulsando **puño y patada a la vez**. Gasta media barra de energía; la barra está debajo de la vida y se llena al golpear, al recibir golpes y al bloquear.
+
+| Luchador | Especial | Qué hace |
+|---|---|---|
+| Kaito | Puño del Dragón | Gancho ascendente que lanza al rival por los aires |
+| Rina | Tormenta | Avanza con tres patadas seguidas; la última derriba |
+| Voss | Martillo Sísmico | Golpe al suelo con onda baja de largo alcance (hay que bloquear agachado) |
+| Nyx | Paso Sombra | Desaparece y ataca por la espalda |
+| Torak | Embestida | Carga con el hombro que arrastra al rival más de 3 metros: perfecta para sacar del ring |
+| Sera | Palma del Loto | Esfera de energía a distancia |
+
 *Poder* multiplica el daño, *Velocidad* la rapidez al moverse y esquivar, y *Peso* reduce cuánto te empujan los golpes (más difícil sacarte del ring).
 
 Selección: J1 con `A` `D` `W` `S` y `F` para confirmar (`G` para cambiar); J2 con las flechas y `K` (`L` para cambiar). Con ratón o pantalla táctil, toca un luchador y vuelve a tocarlo para confirmar.
@@ -53,10 +66,11 @@ Cómo funciona: los móviles se conectan directamente entre sí con WebRTC ([Pee
 | Puño | `F` | `K` (o `Num1`) |
 | Patada | `G` | `L` (o `Num2`) |
 | Guardia | `H` | `Ñ` (o `Num3`) |
+| Especial | `R` (o puño + patada) | `P` (o `Num6`, o puño + patada) |
 
 Mandos: stick/cruceta para moverse, X = puño, A = patada, B/RT = guardia, LB/RB = esquivar. El mando 1 controla al jugador 1 y el mando 2 al jugador 2.
 
-`Esc` pausa. `Enter` en el menú empieza una partida de 2 jugadores. También hay modo **1 jugador contra la CPU**.
+`Esc` pausa. `Enter` en el menú empieza una partida de 2 jugadores. También hay modo **1 jugador contra la CPU**, con tres niveles de dificultad (botón *CPU: Normal* del menú).
 
 ### Movimientos
 

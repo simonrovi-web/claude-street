@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { Fighter, MAX_HP, RING_TOP } from './fighter.js';
+import { Fighter, MAX_HP, RING_TOP, SPECIAL_COST } from './fighter.js';
 import { Input, RemoteInput, toFighterInput, NO_INPUT, toMask, setupTouch } from './input.js';
 import { ATTACKS, STANCE, over } from './poses.js';
 import { ROSTER } from './characters.js';
 import { Sfx } from './audio.js';
 import { Music, themeFor } from './music.js';
-import { AI } from './ai.js';
+import { AI, LEVELS } from './ai.js';
 import { Net, cleanCode } from './net.js';
 import { setupEnvironment, loadArena, loadCrowd, updateCrowd, FX } from './arena.js';
 
@@ -54,6 +54,7 @@ const hud = $('#hud'), menu = $('#menu'), pauseEl = $('#pause'), announceEl = $(
 const onlineEl = $('#online'), endEl = $('#end'), touchEl = $('#touch');
 const bars = [0, 1].map((i) => ({
   fill: $(`.p${i + 1} .fill`), trail: $(`.p${i + 1} .trail`), wins: [...document.querySelectorAll(`.p${i + 1} .wins i`)], trailV: 1,
+  meter: $(`.p${i + 1} .meter i`), meterBox: $(`.p${i + 1} .meter`),
 }));
 setupTouch(input, touchEl);
 
@@ -102,27 +103,33 @@ function tickTexts() {
 const G = {
   mode: '2p', phase: 'loading', phaseT: 0, round: 0, timer: ROUND_TIME * 60,
   hitstop: 0, slowmo: 0, shake: 0, camN: new THREE.Vector3(0, 0, 1),
-  sfx: nsfx, fx: nfx, ai: null, roundWinner: null, crowd: null,
-  onHit(att, def, A, counter) {
+  sfx: nsfx, fx: nfx, ai: null, roundWinner: null, crowd: null, projectiles: [], netProj: [],
+  onHit(att, def, A, counter, pos) {
     const heavy = A.heavy || A.knockdown || counter || def.dead;
     G.hitstop = heavy ? 9 : 5;
     G.shake = heavy ? 0.12 : 0.04;
     nsfx.hit(heavy);
-    nfx.hit(hitPos(att, A), heavy, false);
+    nfx.hit(pos || hitPos(att, A), heavy, false);
+    if (!A.special) att.meter = Math.min(100, att.meter + 8);
+    def.meter = Math.min(100, def.meter + 6);
     if (G.crowd) G.crowd.excite = Math.min(1, G.crowd.excite + (heavy ? 0.35 : 0.12));
     if (counter) pop('¡CONTRAATAQUE!', att.index);
     combo[att.index]++;
     if (combo[att.index] >= 3) pop(`${combo[att.index]} GOLPES`, att.index);
     combo[def.index] = 0;
   },
-  onBlock(att, def, A) {
+  onBlock(att, def, A, pos) {
     G.hitstop = 4;
     nsfx.block();
-    nfx.hit(hitPos(att, A), false, true);
+    nfx.hit(pos || hitPos(att, A), false, true);
+    att.meter = Math.min(100, att.meter + 3);
+    def.meter = Math.min(100, def.meter + 3);
     combo[att.index] = 0;
   },
   onThrowLand(att, def) {
     G.hitstop = 6; G.shake = 0.15;
+    att.meter = Math.min(100, att.meter + 8);
+    def.meter = Math.min(100, def.meter + 6);
     nsfx.thud();
     nfx.dust(def.pos);
     if (G.crowd) G.crowd.excite = Math.min(1, G.crowd.excite + 0.4);
@@ -152,6 +159,28 @@ const G = {
     announce('RING OUT', '', 150, 'ko');
     if (G.crowd) G.crowd.excite = 1;
   },
+  onSpecial(f) {
+    // "destello" del especial: congela un instante y anuncia el nombre
+    G.hitstop = Math.max(G.hitstop, 12);
+    G.shake = 0.06;
+    nsfx.special();
+    nfx.burst(f.pos, 0xffd060);
+    pop(f.def.special.name.toUpperCase() + '!', f.index);
+    if (G.crowd) G.crowd.excite = Math.min(1, G.crowd.excite + 0.3);
+  },
+  spawnProjectile(f, A) {
+    const dir = f.attackFwd.clone();
+    G.projectiles.push({
+      owner: f, A, dir, speed: A.projectile.speed, life: A.projectile.life,
+      pos: f.pos.clone().addScaledVector(dir, 0.55).add(new THREE.Vector3(0, 1.25, 0)),
+    });
+    nsfx.zap();
+  },
+  onSlam(f) {
+    G.shake = 0.25;
+    nsfx.thud();
+    nfx.shock(f.pos.clone(), f.attackFwd.clone());
+  },
   onSplash(f) {
     nsfx.splash();
     nfx.splash(f.pos);
@@ -173,6 +202,8 @@ function resetRound() {
   G.timer = ROUND_TIME * 60;
   G.hitstop = 0; G.slowmo = 0;
   combo[0] = combo[1] = 0;
+  G.projectiles.length = 0;
+  G.netProj = [];
   remote.reset();
   bars.forEach((b) => { b.trailV = 1; });
 }
@@ -204,9 +235,9 @@ function applyPicks(picks) {
 
 function beginMatch() {
   sfx.init();
-  G.ai = G.mode === 'cpu' ? new AI() : null;
+  G.ai = G.mode === 'cpu' ? new AI(cpuLevel) : null;
   applyPicks(sel.cur);
-  fighters.forEach((f) => { f.wins = 0; });
+  fighters.forEach((f) => { f.wins = 0; f.meter = 0; });
   G.round = 0;
   showFightUi();
   if (isHost()) outbox.push(['start', sel.cur.slice()]);
@@ -276,6 +307,7 @@ function step() {
   });
   fighters[0].update(inputs[0], fighters[1], G);
   fighters[1].update(inputs[1], fighters[0], G);
+  updateProjectiles();
 
   // empuje entre cuerpos
   const [a, b] = fighters;
@@ -292,6 +324,49 @@ function step() {
   sendSnapshot();
 }
 
+// ---------------------------------------------------------------- proyectiles
+function updateProjectiles() {
+  for (let i = G.projectiles.length - 1; i >= 0; i--) {
+    const p = G.projectiles[i];
+    p.pos.addScaledVector(p.dir, p.speed);
+    p.life--;
+    const opp = fighters[1 - p.owner.index];
+    let gone = p.life <= 0 || Math.abs(p.pos.x) > 6.5 || Math.abs(p.pos.z) > 6.5;
+    const near = Math.hypot(opp.pos.x - p.pos.x, opp.pos.z - p.pos.z) < 0.5 && Math.abs(opp.pos.y + 1.1 - p.pos.y) < 1.0;
+    if (!gone && near && !opp.invulnerable()) {
+      const of = opp.fwd();
+      const facing = (of.x * -p.dir.x + of.z * -p.dir.z) > 0.2;
+      const blocked = opp.isGuarding() && facing && !opp.isAirborne() && !opp.isCrouching();
+      if (blocked) { opp.takeBlock(p.A, p.dir); G.onBlock(p.owner, opp, p.A, p.pos.clone()); }
+      else { opp.takeHit(p.A, p.dir, false, G, p.owner); G.onHit(p.owner, opp, p.A, false, p.pos.clone()); }
+      gone = true;
+    }
+    if (gone) G.projectiles.splice(i, 1);
+  }
+}
+
+const projMeshes = [];
+for (let i = 0; i < 4; i++) {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff4c0 })));
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: fx.tex, color: 0xffa828, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  halo.scale.setScalar(0.9);
+  g.add(halo);
+  g.visible = false;
+  scene.add(g);
+  projMeshes.push(g);
+}
+function renderProjectiles(t) {
+  const list = isGuest() ? G.netProj : G.projectiles.map((p) => [p.pos.x, p.pos.y, p.pos.z]);
+  projMeshes.forEach((m, i) => {
+    const q = list[i];
+    m.visible = !!q;
+    if (!q) return;
+    m.position.set(q[0], q[1], q[2]);
+    m.children[1].scale.setScalar(0.85 + Math.sin(t * 25 + i) * 0.15);
+  });
+}
+
 // ---------------------------------------------------------------- red
 const r3 = (n) => Math.round(n * 1000) / 1000;
 function sendSnapshot() {
@@ -299,7 +374,8 @@ function sendSnapshot() {
   net.send({
     t: 's', ph: G.phase, tm: G.timer, sh: r3(G.shake), ex: r3(G.crowd ? G.crowd.excite : 0),
     f: fighters.map((f) => [r3(f.pos.x), r3(f.pos.y), r3(f.pos.z), r3(f.facing), f.state, f.f, f.hp, f.wins,
-      f.flash, f.attackName || '', f.hitLevel || '', f.blockCrouch ? 1 : 0, f.stun || 0, f.walkDir || 1, f.dead ? 1 : 0]),
+      f.flash, f.attackName || '', f.hitLevel || '', f.blockCrouch ? 1 : 0, f.stun || 0, f.walkDir || 1, f.dead ? 1 : 0, Math.round(f.meter)]),
+    pj: G.projectiles.map((p) => [r3(p.pos.x), r3(p.pos.y), r3(p.pos.z)]),
     ev: outbox.splice(0),
   });
 }
@@ -313,9 +389,10 @@ function applySnapshot(s) {
     f.pos.set(d[0], d[1], d[2]);
     f.facing = d[3]; f.state = d[4]; f.f = d[5]; f.hp = d[6]; f.wins = d[7]; f.flash = d[8];
     f.attackName = d[9]; f.attack = d[9] ? ATTACKS[d[9]] : null;
-    f.hitLevel = d[10]; f.blockCrouch = !!d[11]; f.stun = d[12]; f.walkDir = d[13]; f.dead = !!d[14];
+    f.hitLevel = d[10]; f.blockCrouch = !!d[11]; f.stun = d[12]; f.walkDir = d[13]; f.dead = !!d[14]; f.meter = d[15] || 0;
     if (f.state !== 'attack') f.attack = null;
   });
+  G.netProj = s.pj || [];
   for (const e of s.ev) playEvent(e);
 }
 
@@ -436,6 +513,10 @@ function updateHud() {
     if (b.trailV < v) b.trailV = v;
     b.trail.style.width = (b.trailV * 100) + '%';
     b.wins.forEach((el, k) => el.classList.toggle('on', k < f.wins));
+    const mt = f.meter || 0;
+    b.meter.style.width = mt + '%';
+    b.meterBox.classList.toggle('ready', mt >= SPECIAL_COST);
+    b.meterBox.classList.toggle('full', mt >= 100);
   });
   timerEl.textContent = Math.max(0, Math.ceil(G.timer / 60));
   timerEl.classList.toggle('low', G.timer < 10 * 60);
@@ -480,6 +561,19 @@ function goFullscreen() {
     Promise.resolve(req.call(el)).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => {});
   }
 }
+
+// --- dificultad de la CPU
+const LEVEL_KEYS = Object.keys(LEVELS);
+let cpuLevel = 'normal';
+try { if (LEVELS[localStorage.getItem('cs-cpu')]) cpuLevel = localStorage.getItem('cs-cpu'); } catch (e) { /* sin almacenamiento */ }
+const levelBtn = $('#btnLevel');
+const showLevel = () => { levelBtn.textContent = `CPU: ${LEVELS[cpuLevel].name}`; };
+showLevel();
+levelBtn.addEventListener('click', () => {
+  cpuLevel = LEVEL_KEYS[(LEVEL_KEYS.indexOf(cpuLevel) + 1) % LEVEL_KEYS.length];
+  try { localStorage.setItem('cs-cpu', cpuLevel); } catch (e) { /* sin almacenamiento */ }
+  showLevel();
+});
 
 // --- online
 function setOnlineStatus(t) { $('#onStatus').textContent = t; }
@@ -718,6 +812,7 @@ function renderSelect() {
     box.querySelector('.nm').textContent = d.name;
     box.querySelector('.tt').textContent = `${d.title} · ${d.origin}`;
     box.querySelector('.stats').innerHTML = statsHtml(d);
+    box.querySelector('.sp').innerHTML = `<b>Especial:</b> ${d.special.name}. <span>${d.special.desc}.</span>`;
     let who = i === 0 ? 'J1' : (G.mode === 'cpu' ? 'CPU' : 'J2');
     if (G.mode === 'online') who = mine.includes(i) ? 'TÚ' : 'RIVAL';
     box.querySelector('.who').textContent = who;
@@ -766,6 +861,7 @@ function frame(now) {
   if (G.crowd) { updateCrowd(G.crowd, paused ? 0 : dt); sfx.crowd(G.crowd.excite); }
   fighters.forEach((f) => f.render(paused ? 0 : dt));
   fx.update(paused ? 0 : dt);
+  renderProjectiles(t);
   updateCamera(dt);
   env.rim.position.copy(camLook).addScaledVector(G.camN, -9).add(new THREE.Vector3(0, 5, 0));
   env.rim.target.position.copy(camLook);
@@ -805,5 +901,6 @@ requestAnimationFrame(frame);
 // para depurar desde la consola
 window.__game = {
   G, fighters, startMatch, beginMatch, sel: () => sel, input, net, music,
+  draw() { updateCamera(1 / 60, true); updateHud(); renderProjectiles(performance.now() / 1000); renderer.render(scene, camera); },
   advance(n = 1) { for (let i = 0; i < n; i++) { step(); fighters.forEach((f) => f.render(STEP)); fx.update(STEP); } },
 };

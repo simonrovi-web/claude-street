@@ -251,6 +251,24 @@ export class FX {
     this.emit(pos, c, heavy ? 22 : 12, heavy ? 0.09 : 0.06, heavy ? 0.22 : 0.15, 18, 0.002);
     this.emit(pos, 0xffffff, 1, 0, heavy ? 1.1 : 0.7, 6, 0);
   }
+  smoke(pos) {
+    const p = pos.clone(); p.y += 0.9;
+    this.emit(p, 0x3a1a4a, 18, 0.05, 0.55, 34, -0.001, false);
+    this.emit(p, 0x9a6ad0, 10, 0.07, 0.25, 20, 0, true);
+  }
+  burst(pos, color = 0xffd060) {
+    const p = pos.clone(); p.y += 1.1;
+    this.emit(p, color, 26, 0.08, 0.2, 26, -0.001);
+    this.emit(p, 0xffffff, 1, 0, 1.6, 10, 0);
+  }
+  shock(pos, dir) {
+    for (let i = 0; i < 6; i++) {
+      const p = pos.clone().addScaledVector(dir, 0.5 + i * 0.35);
+      p.y += 0.05;
+      this.emit(p, 0xb8a890, 6, 0.05, 0.4, 30, -0.0008, false);
+      this.emit(p, 0xffc070, 3, 0.04, 0.15, 14, 0.002);
+    }
+  }
   dust(pos) { this.emit(pos.clone().setY(pos.y + 0.1), 0xb8a890, 14, 0.04, 0.35, 30, -0.0005, false); }
   splash(pos) {
     const p = pos.clone(); p.y = 0.1;

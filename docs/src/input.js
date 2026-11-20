@@ -1,13 +1,13 @@
 // Teclado (dos jugadores en el mismo teclado), mandos (Gamepad API),
 // controles táctiles (jugador local) y entrada remota (modo online).
-export const ACTIONS = ['left', 'right', 'up', 'down', 'sideIn', 'sideOut', 'punch', 'kick', 'guard'];
+export const ACTIONS = ['left', 'right', 'up', 'down', 'sideIn', 'sideOut', 'punch', 'kick', 'guard', 'special'];
 
 export const KEYMAPS = [
   { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'], sideIn: ['KeyQ'], sideOut: ['KeyE'],
-    punch: ['KeyF'], kick: ['KeyG'], guard: ['KeyH'] },
+    punch: ['KeyF'], kick: ['KeyG'], guard: ['KeyH'], special: ['KeyR'] },
   { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'],
     sideIn: ['KeyI', 'Numpad4'], sideOut: ['KeyO', 'Numpad5'],
-    punch: ['KeyK', 'Numpad1'], kick: ['KeyL', 'Numpad2'], guard: ['Semicolon', 'Numpad3'] },
+    punch: ['KeyK', 'Numpad1'], kick: ['KeyL', 'Numpad2'], guard: ['Semicolon', 'Numpad3'], special: ['KeyP', 'Numpad6'] },
 ];
 
 const empty = () => Object.fromEntries(ACTIONS.map((a) => [a, false]));
@@ -49,7 +49,7 @@ export class Input {
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
     return {
       left: ax < -0.5 || b(14), right: ax > 0.5 || b(15), up: ay < -0.6 || b(12), down: ay > 0.6 || b(13),
-      sideIn: b(4), sideOut: b(5), punch: b(2), kick: b(0), guard: b(1) || b(7),
+      sideIn: b(4), sideOut: b(5), punch: b(2), kick: b(0), guard: b(1) || b(7), special: b(3) || b(6),
     };
   }
 

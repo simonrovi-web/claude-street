@@ -29,12 +29,14 @@
     <div class="side p1">
       <div class="name">KAITO</div>
       <div class="hp"><div class="trail"></div><div class="fill"></div></div>
+      <div class="meter"><i></i><span>ESPECIAL</span></div>
       <div class="wins"><i></i><i></i></div>
     </div>
     <div id="timer">45</div>
     <div class="side p2">
       <div class="name">RINA</div>
       <div class="hp"><div class="trail"></div><div class="fill"></div></div>
+      <div class="meter"><i></i><span>ESPECIAL</span></div>
       <div class="wins"><i></i><i></i></div>
     </div>
   </div>
@@ -48,6 +50,7 @@
     <div id="stick"><div class="knob"></div></div>
     <button id="btnPause" class="tpause" aria-label="Pausa">II</button>
     <div class="tbtns">
+      <button data-a="special" class="tb sp">ESPECIAL</button>
       <button data-a="sideIn" class="tb side">FONDO</button>
       <button data-a="sideOut" class="tb side">FRENTE</button>
       <button data-a="guard" class="tb g">GUARDIA</button>
@@ -66,6 +69,7 @@
         <button data-mode="2p" class="primary desk">2 Jugadores</button>
         <button id="btnOnline" class="online">Online · 2 móviles</button>
         <button data-mode="cpu">1 Jugador vs CPU</button>
+        <button id="btnLevel" class="ghost-inline">CPU: Normal</button>
         <button class="musicBtn ghost-inline">Música: sí</button>
       </div>
       <div class="controls desk">
@@ -78,6 +82,7 @@
             <tr><td>Puño</td><td><kbd>F</kbd></td><td><kbd>K</kbd></td></tr>
             <tr><td>Patada</td><td><kbd>G</kbd></td><td><kbd>L</kbd></td></tr>
             <tr><td>Guardia</td><td><kbd>H</kbd></td><td><kbd>Ñ</kbd></td></tr>
+            <tr><td>Especial (o puño + patada)</td><td><kbd>R</kbd></td><td><kbd>P</kbd></td></tr>
           </tbody>
         </table>
       </div>
@@ -90,6 +95,7 @@
           <li><b>Abajo + Patada</b> barrida (bajo, derriba)</li>
           <li><b>Guardia + Puño</b> de cerca: agarre y lanzamiento por detrás</li>
           <li><b>Guardia</b> al ser agarrado: escapar del agarre</li>
+          <li><b>Especial</b> (o puño + patada a la vez): golpe único de cada luchador. Gasta media barra de energía, que se llena al golpear y al recibir golpes</li>
         </ul>
         <p class="hint">Los golpes <b>altos</b> se esquivan agachándose; los <b>bajos</b> se bloquean agachado con guardia. Gana 2 rondas. Saca al rival del ring y ganas la ronda al instante.<span class="desk"> También funciona con mandos. <kbd>Esc</kbd> pausa, <kbd>M</kbd> activa o quita la música.</span></p>
       </div>
@@ -103,6 +109,7 @@
       <div class="nm"></div>
       <div class="tt"></div>
       <div class="stats"></div>
+      <div class="sp"></div>
       <div class="state"></div>
     </div>
     <div class="sel-info p2">
@@ -110,6 +117,7 @@
       <div class="nm"></div>
       <div class="tt"></div>
       <div class="stats"></div>
+      <div class="sp"></div>
       <div class="state"></div>
     </div>
     <div class="sel-bottom">

@@ -135,6 +135,55 @@ export const ATTACKS = {
   },
 };
 
+// ---------- golpes especiales (uno por luchador, cuestan media barra de energía) ----------
+// Campos extra: hits = ventanas activas [desde, hasta]; move = [desde, hasta, velocidad];
+// teleport = frame en el que aparece detrás del rival; projectile = { at, speed, life };
+// slamAt = frame del golpe contra el suelo; launch = impulso vertical al derribar; keys = animación propia.
+const DRAGON_W = over(CROUCH, { rsx: -0.4, rex: -2.2, lsx: -1.0, lex: -2.0, sy: 0.4 });
+const DRAGON_S = over(STANCE, { y: 0.08, hy: 0.1, sy: 0.6, sx: -0.25, hd: -0.3, rsx: -3.0, rsz: 0.15, rex: -0.15, lsx: -0.6, lex: -1.6, lhx: -1.0, lkx: 1.3, rhx: 0.1, rkx: 0.1 });
+const STORM_W = over(STANCE, { lhx: -0.9, lkx: 1.6, y: 0.0, hx: -0.05 });
+const STORM_K1 = over(STANCE, { rhx: -1.7, rhz: -0.5, rkx: 0.1, hx: -0.25, hy: 0.4, lkx: 0.15, lsz: 0.6, rsz: -0.5 });
+const STORM_K2 = over(STANCE, { lhx: -1.8, lhz: 0.5, lkx: 0.1, hx: -0.25, hy: -0.9, rkx: 0.15, lsz: 0.6, rsz: -0.6 });
+const STORM_K3 = over(STANCE, { rhx: -2.1, rhz: -0.7, rkx: 0.05, hx: -0.35, hy: 0.6, lkx: 0.1, y: 0.04, lsz: 0.9, rsz: -0.9 });
+const QUAKE_W = over(STANCE, { y: 0.02, hy: 0, sy: 0, sx: -0.3, hd: -0.3, lsx: -3.0, lsz: 0.2, lex: -0.5, rsx: -3.0, rsz: -0.2, rex: -0.5, lhx: -0.2, rhx: 0.2 });
+const QUAKE_S = over(CROUCH, { y: -0.42, hy: 0, sy: 0, sx: 0.95, hd: 0.3, lsx: -1.1, lsz: 0.05, lex: -0.3, rsx: -1.1, rsz: -0.05, rex: -0.3 });
+const SHADOW_W = over(CROUCH, { y: -0.45, sx: 0.6, lsx: 0.6, rsx: 0.6, lsz: 0.4, rsz: -0.4, lex: -0.3, rex: -0.3 });
+const SHADOW_S = over(STANCE, { rsx: -1.55, rsz: 0.1, rex: -0.05, lsx: -0.3, lsz: 0.5, lex: -1.2, sy: 0.8, hy: -0.1, y: -0.1, lhx: -0.6, lkx: 0.7 });
+const CHARGE_S = over(STANCE, { y: -0.12, sx: 0.55, hy: 0.6, sy: 0.4, hd: 0.2, lsx: -0.5, lsz: 0.3, lex: -2.2, rsx: -0.3, rsz: -0.2, rex: -2.0, lhx: -0.7, lkx: 0.9, rhx: 0.5, rkx: 0.3 });
+const LOTUS_W = over(STANCE, { hy: -0.1, sy: -0.3, lsx: 0.3, lsz: 0.2, lex: -1.9, rsx: 0.3, rsz: -0.2, rex: -1.9, y: -0.1 });
+const LOTUS_S = over(STANCE, { hy: -0.1, sy: 0.1, sx: 0.1, lsx: -1.5, lsz: -0.12, lex: -0.1, rsx: -1.5, rsz: 0.12, rex: -0.1, y: -0.14, lhx: -0.6, lkx: 0.7 });
+
+Object.assign(ATTACKS, {
+  sp_dragon: {
+    special: true, s: 5, a: 8, r: 26, dmg: 24, level: 'mid', reach: 1.0, width: 0.55, bs: 18, push: 0.05,
+    knockdown: true, launch: 0.17, heavy: true, move: [0, 6, 0.035], W: DRAGON_W, S: DRAGON_S,
+  },
+  sp_storm: {
+    special: true, s: 8, a: 16, r: 22, dmg: 9, level: 'mid', reach: 1.15, width: 0.5, hs: 20, bs: 10, push: 0.04,
+    hits: [[8, 11], [14, 17], [20, 24]], knockdownLast: true, heavy: true, move: [4, 24, 0.05],
+    keys: [[0, STANCE], [6, STORM_W], [9, STORM_K1], [12, STORM_W], [15, STORM_K2], [18, STORM_W], [21, STORM_K3], [24, STORM_K3], [40, STANCE]],
+  },
+  sp_quake: {
+    special: true, s: 22, a: 6, r: 26, dmg: 26, level: 'low', reach: 2.4, width: 1.2, bs: 16, push: 0.08,
+    knockdown: true, heavy: true, slamAt: 22, W: QUAKE_W, S: QUAKE_S,
+  },
+  sp_shadow: {
+    special: true, s: 13, a: 5, r: 20, dmg: 20, level: 'mid', reach: 1.05, width: 0.6, bs: 14, push: 0.07,
+    knockdown: true, heavy: true, teleport: 9,
+    keys: [[0, STANCE], [6, SHADOW_W], [10, SHADOW_W], [13, SHADOW_S], [18, SHADOW_S], [32, STANCE]],
+  },
+  sp_charge: {
+    special: true, s: 10, a: 20, r: 22, dmg: 18, level: 'mid', reach: 0.95, width: 0.6, bs: 16, push: 0.34,
+    knockdown: true, heavy: true, move: [10, 30, 0.11], stopOnHit: true,
+    keys: [[0, STANCE], [8, over(CHARGE_S, { y: -0.2, sx: 0.7 })], [12, CHARGE_S], [30, CHARGE_S], [44, STANCE]],
+  },
+  sp_lotus: {
+    special: true, s: 14, a: 0, r: 24, dmg: 18, level: 'mid', reach: 0, width: 0, hs: 22, bs: 14, push: 0.12,
+    projectile: { at: 14, speed: 0.17, life: 55 },
+    keys: [[0, STANCE], [8, LOTUS_W], [13, LOTUS_W], [15, LOTUS_S], [26, LOTUS_S], [38, STANCE]],
+  },
+});
+
 const GRAB = over(STANCE, { lsx: -1.45, lex: -0.4, rsx: -1.45, rex: -0.4, lsz: -0.25, rsz: 0.25, sy: 0, hy: 0 });
 export const THROW_KEYS = [
   [0, STANCE],
