@@ -10,6 +10,8 @@ La arena (ring, estanque, antorchas, gradas y público) está modelada en Blende
 
 Estilo de dibujo animado: sombreado por bandas, contorno oscuro alrededor de los luchadores, colores vivos y un escenario luminoso al atardecer. Los luchadores tienen proporciones juveniles (cabeza algo mayor) y caras expresivas con ojos de color, cejas y boca. Los golpes fuertes muestran onomatopeyas de cómic (¡PAM!, ¡ZAS!, ¡POW!...).
 
+Efectos: resplandor (bloom) en el fuego, las chispas, los especiales y los ojos de Nyx; estelas de color en puños y pies al golpear; líneas de velocidad, ondas de choque y destello de pantalla en los golpes fuertes y especiales; confeti al ganar; ascuas que suben de las antorchas; estandartes que ondean y nubes que se mueven. En el móvil se desactiva el resplandor para que vaya fluido.
+
 ## Luchadores
 
 Antes de cada combate se elige luchador. Si los dos eligen el mismo, el segundo sale con colores alternativos.
@@ -126,6 +128,8 @@ docs/                  juego web (publicado con GitHub Pages)
   src/characters.js    plantilla de luchadores y construcción de sus modelos
   src/fighter.js       luchador: estados, física y golpes
   src/toon.js          sombreado de dibujo animado y contornos
+  src/postfx.js        resplandor (bloom) y viñeta
+  src/effects.js       estelas de golpes y confeti
   src/poses.js         poses y tabla de ataques (frames, daño, alcance)
   src/arena.js         carga de la arena, público, luces y partículas
   src/input.js         teclado, mandos y controles táctiles

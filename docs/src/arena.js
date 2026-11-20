@@ -24,6 +24,7 @@ export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
       gl_FragColor = vec4(c,1.0); }`,
   });
   scene.add(new THREE.Mesh(skyGeo, skyMat));
+  const clouds = makeClouds(scene);
   scene.fog = new THREE.Fog(0xffb995, 60, 170);
 
   scene.add(new THREE.HemisphereLight(0xfff0e0, 0x8a6a9a, 1.1));
@@ -47,7 +48,47 @@ export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
   // luz de contorno detrás de los luchadores (la mueve la cámara) para separarlos del fondo
   const rim = new THREE.DirectionalLight(0x9fe8ff, 2.0);
   scene.add(rim, rim.target);
-  return { torches, rim };
+  return { torches, rim, clouds };
+}
+
+function cloudTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 128;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 9; i++) {
+    const x = 40 + Math.random() * 176, y = 60 + Math.random() * 30, r = 26 + Math.random() * 30;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(255,255,255,0.95)');
+    gr.addColorStop(0.7, 'rgba(255,240,235,0.8)');
+    gr.addColorStop(1, 'rgba(255,230,230,0)');
+    g.fillStyle = gr;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function makeClouds(scene) {
+  const list = [];
+  for (let i = 0; i < 9; i++) {
+    const m = new THREE.SpriteMaterial({ map: cloudTexture(), fog: false, transparent: true, depthWrite: false, color: 0xfff2ee });
+    const sp = new THREE.Sprite(m);
+    const a = Math.random() * Math.PI * 2, r = 150 + Math.random() * 60;
+    sp.position.set(Math.cos(a) * r, 38 + Math.random() * 40, Math.sin(a) * r);
+    const sc = 50 + Math.random() * 40;
+    sp.scale.set(sc, sc * 0.45, 1);
+    sp.userData.a = a; sp.userData.r = r; sp.userData.sp = 0.004 + Math.random() * 0.004;
+    scene.add(sp);
+    list.push(sp);
+  }
+  return list;
+}
+export function animateSky(env, dt) {
+  for (const c of env.clouds) {
+    c.userData.a += c.userData.sp * dt;
+    c.position.x = Math.cos(c.userData.a) * c.userData.r;
+    c.position.z = Math.sin(c.userData.a) * c.userData.r;
+  }
 }
 
 // ---------------------------------------------------------------- texturas
@@ -110,6 +151,7 @@ export async function loadArena(scene, base = 'assets/') {
     if (/Agua/.test(o.name)) water = o;
     if (o.material && o.material.name === 'M_Fuego') {
       o.material = new THREE.MeshBasicMaterial({ color: 0xffb040 });
+      o.material.color.multiplyScalar(5);
       o.userData.fire = true;
     } else if (o.material && o.material.isMeshStandardMaterial && !/Agua/.test(o.name)) {
       const m = o.material;
@@ -141,7 +183,62 @@ export async function loadArena(scene, base = 'assets/') {
   }
   const fires = [];
   root.traverse((o) => { if (o.userData.fire) fires.push(o); });
-  return { root, waterTex, fires };
+  const banners = makeBanners(scene);
+  return { root, waterTex, fires, banners };
+}
+
+// ---------------------------------------------------------------- estandartes
+const BANNERS = [[0xe0281e, 0xffd21f], [0x2f7bff, 0xffffff], [0xb453ff, 0x7dffea], [0xff8a1f, 0x2a1a44]];
+function bannerTexture(c1, c2) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+  g.fillStyle = hex(c1); g.fillRect(0, 0, 128, 256);
+  g.fillStyle = hex(c2); g.fillRect(0, 0, 128, 14); g.fillRect(10, 0, 8, 256); g.fillRect(110, 0, 8, 256);
+  // emblema: estrella dentro de un círculo
+  g.beginPath(); g.arc(64, 110, 36, 0, Math.PI * 2); g.fillStyle = hex(c2); g.fill();
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? 12 : 28, a = -Math.PI / 2 + i * Math.PI / 5;
+    g.lineTo(64 + Math.cos(a) * r, 110 + Math.sin(a) * r);
+  }
+  g.closePath(); g.fillStyle = hex(c1); g.fill();
+  // punta inferior en forma de cola de golondrina
+  g.globalCompositeOperation = 'destination-out';
+  g.beginPath(); g.moveTo(0, 256); g.lineTo(64, 214); g.lineTo(128, 256); g.closePath(); g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function makeBanners(scene) {
+  const list = [];
+  [-14, -6, 6, 14].forEach((x, i) => {
+    const geo = new THREE.PlaneGeometry(1.5, 3.0, 6, 14);
+    geo.translate(0, -1.5, 0); // el origen arriba: cuelga del dintel
+    const [c1, c2] = BANNERS[i % BANNERS.length];
+    const m = toonMat(0xffffff, { map: bannerTexture(c1, c2), side: THREE.DoubleSide, alphaTest: 0.5 });
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, 9.15, -26.55);
+    mesh.castShadow = true;
+    mesh.userData.base = Float32Array.from(geo.attributes.position.array);
+    mesh.userData.ph = i * 1.7;
+    scene.add(mesh);
+    list.push(mesh);
+  });
+  return list;
+}
+export function animateBanners(list, t) {
+  for (const b of list) {
+    const pos = b.geometry.attributes.position, base = b.userData.base;
+    for (let i = 0; i < pos.count; i++) {
+      const x = base[i * 3], y = base[i * 3 + 1];
+      const amp = (-y / 3.0) * 0.22; // ondea más abajo que arriba
+      pos.array[i * 3 + 2] = Math.sin(t * 2.2 + y * 1.8 + x * 1.5 + b.userData.ph) * amp;
+    }
+    pos.needsUpdate = true;
+    b.geometry.computeVertexNormals();
+  }
 }
 
 // ---------------------------------------------------------------- público
@@ -225,6 +322,19 @@ function sparkTexture() {
   return new THREE.CanvasTexture(c);
 }
 
+function ringTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 34, 64, 64, 62);
+  gr.addColorStop(0, 'rgba(255,255,255,0)');
+  gr.addColorStop(0.55, 'rgba(255,255,255,1)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+
 export class FX {
   constructor(scene) {
     this.scene = scene;
@@ -237,6 +347,26 @@ export class FX {
       this.pool.push({ s, life: 0, max: 1, v: new THREE.Vector3(), g: 0, size: 0.2 });
     }
     this.i = 0;
+    // anillos de onda de choque
+    this.ringTex = ringTexture();
+    this.rings = [];
+    for (let i = 0; i < 8; i++) {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.ringTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+      s.visible = false;
+      scene.add(s);
+      this.rings.push({ s, life: 0, max: 1, size: 1 });
+    }
+    this.ri = 0;
+  }
+  ring(pos, color, size = 1.4, life = 14) {
+    const r = this.rings[this.ri++ % this.rings.length];
+    r.s.position.copy(pos);
+    r.s.material.color.set(color).multiplyScalar(3.5);
+    r.life = r.max = life; r.size = size;
+    r.s.visible = true;
+  }
+  ember(pos) {
+    this.emit(pos, 0xff9a30, 1, 0.012, 0.07, 70, -0.0006);
   }
   emit(pos, color, n, speed, size, life, grav = 0.004, additive = true) {
     for (let k = 0; k < n; k++) {
@@ -246,6 +376,7 @@ export class FX {
       p.life = p.max = life * (0.6 + Math.random() * 0.6);
       p.g = grav; p.size = size;
       p.s.material.color.set(color);
+      if (additive) p.s.material.color.multiplyScalar(3.5); // brillan con el bloom
       p.s.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
       p.s.visible = true;
     }
@@ -254,6 +385,7 @@ export class FX {
     const c = blocked ? 0x66aaff : heavy ? 0xffcc55 : 0xfff2c0;
     this.emit(pos, c, heavy ? 22 : 12, heavy ? 0.09 : 0.06, heavy ? 0.22 : 0.15, 18, 0.002);
     this.emit(pos, 0xffffff, 1, 0, heavy ? 1.1 : 0.7, 6, 0);
+    if (heavy || blocked) this.ring(pos, c, heavy ? 1.8 : 1.0, heavy ? 16 : 10);
   }
   smoke(pos) {
     const p = pos.clone(); p.y += 0.9;
@@ -281,6 +413,14 @@ export class FX {
   }
   update(dt) {
     const k = dt * 60;
+    for (const r of this.rings) {
+      if (!r.s.visible) continue;
+      r.life -= k;
+      if (r.life <= 0) { r.s.visible = false; continue; }
+      const t = 1 - r.life / r.max;
+      r.s.scale.setScalar(0.2 + t * r.size);
+      r.s.material.opacity = 1 - t;
+    }
     for (const p of this.pool) {
       if (!p.s.visible) continue;
       p.life -= k;

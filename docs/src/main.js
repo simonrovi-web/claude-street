@@ -7,7 +7,9 @@ import { Sfx } from './audio.js';
 import { Music, themeFor } from './music.js';
 import { AI, LEVELS } from './ai.js';
 import { Net, cleanCode } from './net.js';
-import { setupEnvironment, loadArena, loadCrowd, updateCrowd, FX } from './arena.js';
+import { setupEnvironment, loadArena, loadCrowd, updateCrowd, FX, animateSky, animateBanners } from './arena.js';
+import { createPost } from './postfx.js';
+import { Trail, Confetti } from './effects.js';
 
 const ROUND_TIME = 45;     // segundos
 const ROUNDS_TO_WIN = 2;
@@ -27,8 +29,10 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 600);
+let post = null;
 function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
+  if (post) post.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   // en pantallas estrechas (móvil en vertical) abrimos el ángulo para que quepan los dos
   camera.fov = camera.aspect < 1 ? 62 : 42;
@@ -38,6 +42,8 @@ addEventListener('resize', resize);
 resize();
 
 const env = setupEnvironment(scene, TOUCH ? 1024 : 2048, renderer);
+post = createPost(renderer, scene, camera, { bloom: !TOUCH });
+resize();
 const fx = new FX(scene);
 const sfx = new Sfx();
 const music = new Music(sfx);
@@ -47,6 +53,9 @@ const net = new Net();
 
 const fighters = [new Fighter(scene, ROSTER[0], 0), new Fighter(scene, ROSTER[1], 1)];
 fighters.forEach((f) => scene.add(f.blob));
+const TRAIL_COLORS = { kaito: 0xff5a2a, rina: 0x3fb0ff, voss: 0xffc040, nyx: 0xc060ff, torak: 0xff3040, sera: 0xffd060 };
+const trails = fighters.map(() => new Trail(scene, 0xffffff));
+const confetti = new Confetti(scene);
 
 // ---------------------------------------------------------------- HUD
 const $ = (s) => document.querySelector(s);
@@ -74,6 +83,12 @@ function recorder(target, kind) {
     },
   });
 }
+const speedEl = document.getElementById('speed'), flashEl = document.getElementById('flash');
+const vfx = {
+  speed() { speedEl.classList.remove('show'); void speedEl.offsetWidth; speedEl.classList.add('show'); },
+  flash(color = '#ffffff') { flashEl.style.background = color; flashEl.classList.remove('show'); void flashEl.offsetWidth; flashEl.classList.add('show'); },
+};
+const nvfx = recorder(vfx, 'v');
 const nsfx = recorder(sfx, 's');
 const nfx = recorder(fx, 'f');
 
@@ -137,7 +152,7 @@ const G = {
     G.shake = heavy ? 0.12 : 0.04;
     nsfx.hit(heavy);
     nfx.hit(pos || hitPos(att, A), heavy, false);
-    if (heavy) comic(pos || hitPos(att, A), randWord());
+    if (heavy) { comic(pos || hitPos(att, A), randWord()); nvfx.speed(); }
     if (!A.special) att.meter = Math.min(100, att.meter + 8);
     def.meter = Math.min(100, def.meter + 6);
     if (G.crowd) G.crowd.excite = Math.min(1, G.crowd.excite + (heavy ? 0.35 : 0.12));
@@ -199,6 +214,8 @@ const G = {
     G.shake = 0.06;
     nsfx.special();
     nfx.burst(f.pos, 0xffd060);
+    nvfx.flash('rgba(255,255,255,0.75)');
+    nvfx.speed();
     pop(f.def.special.name.toUpperCase() + '!', f.index);
     if (G.crowd) G.crowd.excite = Math.min(1, G.crowd.excite + 0.3);
   },
@@ -267,6 +284,7 @@ function startMatch(mode) { openSelect(mode); }
 function applyPicks(picks) {
   fighters[0].setCharacter(ROSTER[picks[0]], false);
   fighters[1].setCharacter(ROSTER[picks[1]], picks[0] === picks[1]); // mismo luchador: colores alternativos
+  fighters.forEach((f, i) => trails[i].setColor(TRAIL_COLORS[f.def.id] || 0xffffff));
 }
 
 function beginMatch() {
@@ -422,6 +440,8 @@ function finisherHit(att, def, pos) {
   nfx.hit(pos, true, false); nfx.burst(def.pos, 0xff5030); nfx.burst(def.pos, 0xffd060);
   if (G.crowd) G.crowd.excite = 1;
   comic(pos, '¡KABOOM!');
+  nvfx.flash('rgba(255,225,74,0.85)');
+  nvfx.speed();
   announce('¡REMATE!', att.def.special.name, 150, 'win');
   G.phase = 'ko'; G.phaseT = 40;
 }
@@ -479,8 +499,11 @@ function updateProjectiles() {
 const projMeshes = [];
 for (let i = 0; i < 4; i++) {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff4c0 })));
+  const core = new THREE.MeshBasicMaterial({ color: 0xfff4c0 });
+  core.color.multiplyScalar(4);
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), core));
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: fx.tex, color: 0xffa828, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  halo.material.color.multiplyScalar(3);
   halo.scale.setScalar(0.9);
   g.add(halo);
   g.visible = false;
@@ -531,6 +554,7 @@ function playEvent(e) {
   const [k] = e;
   if (k === 's') { const fn = sfx[e[1]]; if (fn) fn.apply(sfx, e[2].map(des)); }
   else if (k === 'f') { const fn = fx[e[1]]; if (fn) fn.apply(fx, e[2].map(des)); }
+  else if (k === 'v') { const fn = vfx[e[1]]; if (fn) fn.apply(vfx, e[2].map(des)); }
   else if (k === 'a') announce(e[1], e[2], e[3], e[4]);
   else if (k === 'p') pop(e[1], e[2]);
   else if (k === 'c') comic(des(e[1]), e[2]);
@@ -971,6 +995,8 @@ function renderSelect() {
 // ---------------------------------------------------------------- bucle
 let arena = null;
 let acc = 0, last = performance.now();
+let emberAcc = 0, lastPhase = '';
+const paused0 = () => G.phase === 'paused';
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
@@ -990,6 +1016,20 @@ function frame(now) {
     }
   }
   const t = now / 1000;
+  animateSky(env, dt);
+  if (arena && arena.banners) animateBanners(arena.banners, t);
+  emberAcc += dt;
+  while (emberAcc > 0.09) { // ascuas que suben de las antorchas
+    emberAcc -= 0.09;
+    const l = env.torches[(Math.random() * 4) | 0];
+    fx.ember(new THREE.Vector3(l.position.x + (Math.random() - 0.5) * 0.2, 3.1, l.position.z + (Math.random() - 0.5) * 0.2));
+  }
+  if (G.phase === 'matchEnd' && lastPhase !== 'matchEnd') {
+    const w = fighters.find((f) => f.wins >= ROUNDS_TO_WIN) || fighters[0];
+    confetti.burst(w.pos);
+  }
+  lastPhase = G.phase;
+  confetti.update(paused0() ? 0 : dt);
   env.torches.forEach((l, i) => { l.intensity = 7 + Math.sin(t * 13 + i * 2) * 0.8 + Math.sin(t * 29 + i) * 0.6; });
   if (arena) {
     if (arena.waterTex) { arena.waterTex.offset.x = t * 0.01; arena.waterTex.offset.y = t * 0.006; }
@@ -1000,14 +1040,18 @@ function frame(now) {
   music.play(themeFor(G.phase));
   music.setLevel(paused ? 0.35 : G.phase === 'ko' ? 0.55 : 1);
   if (G.crowd) { updateCrowd(G.crowd, paused ? 0 : dt); sfx.crowd(G.crowd.excite); }
-  fighters.forEach((f) => f.render(paused ? 0 : dt));
+  fighters.forEach((f, i) => {
+    f.render(paused ? 0 : dt);
+    f.root.updateMatrixWorld(true);
+    trails[i].update(f, camera);
+  });
   fx.update(paused ? 0 : dt);
   renderProjectiles(t);
   updateCamera(dt);
   env.rim.position.copy(camLook).addScaledVector(G.camN, -9).add(new THREE.Vector3(0, 5, 0));
   env.rim.target.position.copy(camLook);
   updateHud();
-  renderer.render(scene, camera);
+  post.render();
 }
 
 (async () => {
@@ -1041,7 +1085,7 @@ requestAnimationFrame(frame);
 
 // para depurar desde la consola
 window.__game = {
-  G, fighters, startMatch, beginMatch, sel: () => sel, input, net, music,
-  draw() { updateCamera(1 / 60, true); updateHud(); renderProjectiles(performance.now() / 1000); renderer.render(scene, camera); },
+  G, fighters, startMatch, beginMatch, sel: () => sel, input, net, music, trails, confetti, camera, fx, post: () => post,
+  draw() { updateCamera(1 / 60, true); updateHud(); renderProjectiles(performance.now() / 1000); post.render(); },
   advance(n = 1) { for (let i = 0; i < n; i++) { step(); fighters.forEach((f) => f.render(STEP)); fx.update(STEP); } },
 };

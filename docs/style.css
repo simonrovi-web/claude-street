@@ -286,3 +286,20 @@ kbd { border: 2px solid var(--outline); box-shadow: 0 2px 0 var(--outline); bord
 #trainInfo b { color: #7dffea; }
 .code { color: #fff35a; -webkit-text-stroke: 3px var(--outline); paint-order: stroke fill; }
 #codeInput { border: 3px solid var(--outline); border-radius: 14px; background: #2a1a44; }
+
+
+/* ---------- efectos de pantalla: líneas de velocidad y destello ---------- */
+#speed, #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
+#speed {
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0.55) 0deg 1.2deg, transparent 1.2deg 7deg);
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 32%, #000 78%);
+  mask-image: radial-gradient(ellipse at center, transparent 32%, #000 78%);
+}
+#speed.show { animation: speedLines .32s ease-out forwards; }
+@keyframes speedLines { 0% { opacity: 0.95; transform: scale(1.12) rotate(0deg); } 100% { opacity: 0; transform: scale(1) rotate(4deg); } }
+#flash.show { animation: screenFlash .28s ease-out forwards; }
+@keyframes screenFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  #speed.show { animation: none; }
+  #flash.show { animation: screenFlash .28s linear forwards; opacity: 0; }
+}

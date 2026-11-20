@@ -151,6 +151,7 @@ export function buildModel(def, alt = false) {
   const footM = L.feet === 'bare' ? skin : M(L.footColor ?? 0x222222, 0.72);
   const dark = new THREE.MeshBasicMaterial({ color: 0x0c0806 });
   const glow = new THREE.MeshBasicMaterial({ color: L.glow ?? 0x40e0d0 });
+  glow.color.multiplyScalar(4); // más allá de 1: brilla con el bloom
 
   const part = (geo, mt, parent, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => {
     const mesh = new THREE.Mesh(geo, mt);
@@ -374,10 +375,10 @@ export function buildModel(def, alt = false) {
     part(sphere(0.05 * k, 1.0, 1.05, 1.1, 14, 10), handM, el, 0, -0.29, 0.008);
     part(new THREE.CylinderGeometry(0.03 * k, 0.03 * k, 0.085 * k, 8), handM, el, 0, -0.33 * (fs > 1 ? 1.02 : 1), 0.025, 0, 0, Math.PI / 2); // nudillos
     part(sphere(0.02 * k, 1, 1.4, 1, 6, 6), handM, el, side * -0.035 * k, -0.28, 0.04); // pulgar
-    return [sh, el];
+    return [sh, el, joint(el, 0, -0.3, 0.02)]; // el último: punto del puño (para las estelas)
   };
-  const [lSh, lEl] = arm(1);
-  const [rSh, rEl] = arm(-1);
+  const [lSh, lEl, lFist] = arm(1);
+  const [rSh, rEl, rFist] = arm(-1);
 
   // ---------------- piernas
   const wide = (L.top === 'gi' || L.top === 'robe') ? 1.18 : 1;
@@ -406,10 +407,10 @@ export function buildModel(def, alt = false) {
         part(box(0.1, 0.012, 0.02), footM, kn, 0, -0.43, 0.06);
       }
     }
-    return [hp, kn];
+    return [hp, kn, joint(kn, 0, -0.45, 0.1)];
   };
-  const [lHip, lKn] = leg(1);
-  const [rHip, rKn] = leg(-1);
+  const [lHip, lKn, lFoot] = leg(1);
+  const [rHip, rKn, rFoot] = leg(-1);
 
   // ---------------- telas que cuelgan de la cintura
   const cloth = [];
@@ -425,5 +426,5 @@ export function buildModel(def, alt = false) {
   }
 
   addOutlines(root, 0.011 * Math.max(1, g * 0.95));
-  return { root, tilt, hips, spine, head, lSh, lEl, rSh, rEl, lHip, lKn, rHip, rKn, mats, cloth };
+  return { root, tilt, hips, spine, head, lSh, lEl, rSh, rEl, lHip, lKn, rHip, rKn, mats, cloth, lFist, rFist, lFoot, rFoot };
 }
