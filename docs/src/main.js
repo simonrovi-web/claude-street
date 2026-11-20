@@ -21,8 +21,8 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: !TOUCH || devicePi
 renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMapping = THREE.NeutralToneMapping; // conserva los colores vivos
+renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
@@ -86,6 +86,30 @@ function announce(text, sub = '', frames = 90, cls = '') {
   subEl.className = sub ? 'show' : '';
   announceTimer = frames;
 }
+// onomatopeyas de cómic en los golpes fuertes
+const COMIC = ['¡PAM!', '¡ZAS!', '¡POW!', '¡TOMA!', '¡CRAC!', '¡BAM!'];
+const comicEls = Array.from({ length: 5 }, () => {
+  const el = document.createElement('div');
+  el.className = 'comic';
+  document.body.appendChild(el);
+  return el;
+});
+let comicI = 0;
+function comic(pos, word) {
+  if (isHost()) outbox.push(['c', ser(pos), word]);
+  const v = pos.clone().project(camera);
+  if (v.z > 1) return;
+  const el = comicEls[comicI++ % comicEls.length];
+  el.textContent = word;
+  el.style.left = ((v.x * 0.5 + 0.5) * innerWidth) + 'px';
+  el.style.top = ((-v.y * 0.5 + 0.5) * innerHeight - 40) + 'px';
+  el.style.setProperty('--rot', ((Math.random() - 0.5) * 30).toFixed(0) + 'deg');
+  el.classList.remove('show');
+  void el.offsetWidth; // reinicia la animación
+  el.classList.add('show');
+}
+const randWord = () => COMIC[(Math.random() * COMIC.length) | 0];
+
 let popTimer = 0;
 const popEl = $('#pop');
 function pop(text, side) {
@@ -113,6 +137,7 @@ const G = {
     G.shake = heavy ? 0.12 : 0.04;
     nsfx.hit(heavy);
     nfx.hit(pos || hitPos(att, A), heavy, false);
+    if (heavy) comic(pos || hitPos(att, A), randWord());
     if (!A.special) att.meter = Math.min(100, att.meter + 8);
     def.meter = Math.min(100, def.meter + 6);
     if (G.crowd) G.crowd.excite = Math.min(1, G.crowd.excite + (heavy ? 0.35 : 0.12));
@@ -396,6 +421,7 @@ function finisherHit(att, def, pos) {
   nsfx.hit(true); nsfx.thud();
   nfx.hit(pos, true, false); nfx.burst(def.pos, 0xff5030); nfx.burst(def.pos, 0xffd060);
   if (G.crowd) G.crowd.excite = 1;
+  comic(pos, '¡KABOOM!');
   announce('¡REMATE!', att.def.special.name, 150, 'win');
   G.phase = 'ko'; G.phaseT = 40;
 }
@@ -507,6 +533,7 @@ function playEvent(e) {
   else if (k === 'f') { const fn = fx[e[1]]; if (fn) fn.apply(fx, e[2].map(des)); }
   else if (k === 'a') announce(e[1], e[2], e[3], e[4]);
   else if (k === 'p') pop(e[1], e[2]);
+  else if (k === 'c') comic(des(e[1]), e[2]);
   else if (k === 'start') {
     if (e[1]) { sel.cur = e[1].slice(); applyPicks(sel.cur); }
     fighters.forEach((f) => f.reset(f.index ? 1.5 : -1.5, f.index ? -Math.PI / 2 : Math.PI / 2));
@@ -787,6 +814,8 @@ ROSTER.forEach((d, i) => {
   b.className = 'card';
   b.dataset.i = i;
   b.innerHTML = `<div class="ph"></div><span>${d.name}</span><em class="m1">J1</em><em class="m2">J2</em>`;
+  const cc = d.look.topColor ?? d.look.paint ?? 0x888888;
+  b.style.setProperty('--cc', '#' + cc.toString(16).padStart(6, '0'));
   b.addEventListener('click', () => tapCard(i));
   gridEl.appendChild(b);
 });
@@ -798,7 +827,7 @@ function makePortraits() {
   cv.width = W; cv.height = H;
   const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: true });
   r.outputColorSpace = THREE.SRGBColorSpace;
-  r.toneMapping = THREE.ACESFilmicToneMapping;
+  r.toneMapping = THREE.NeutralToneMapping;
   const sc = new THREE.Scene();
   sc.add(new THREE.HemisphereLight(0xffe2c8, 0x2a1c18, 1.1));
   const key = new THREE.DirectionalLight(0xffe0c0, 2.6); key.position.set(1.5, 2.5, 2); sc.add(key);

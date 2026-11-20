@@ -6,6 +6,10 @@ La arena (ring, estanque, antorchas, gradas y público) está modelada en Blende
 
 **Jugar:** https://simonrovi-web.github.io/claude-street/
 
+## Estilo visual
+
+Estilo de dibujo animado: sombreado por bandas, contorno oscuro alrededor de los luchadores, colores vivos y un escenario luminoso al atardecer. Los luchadores tienen proporciones juveniles (cabeza algo mayor) y caras expresivas con ojos de color, cejas y boca. Los golpes fuertes muestran onomatopeyas de cómic (¡PAM!, ¡ZAS!, ¡POW!...).
+
 ## Luchadores
 
 Antes de cada combate se elige luchador. Si los dos eligen el mismo, el segundo sale con colores alternativos.
@@ -121,6 +125,7 @@ docs/                  juego web (publicado con GitHub Pages)
   src/main.js          bucle, rondas, cámara y HUD
   src/characters.js    plantilla de luchadores y construcción de sus modelos
   src/fighter.js       luchador: estados, física y golpes
+  src/toon.js          sombreado de dibujo animado y contornos
   src/poses.js         poses y tabla de ataques (frames, daño, alcance)
   src/arena.js         carga de la arena, público, luces y partículas
   src/input.js         teclado, mandos y controles táctiles

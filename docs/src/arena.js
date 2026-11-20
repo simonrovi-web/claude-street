@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RING_TOP } from './fighter.js';
+import { toonMat, vivid, gradientMap } from './toon.js';
 
 // ---------------------------------------------------------------- cielo y luces
 export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
@@ -16,17 +17,17 @@ export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
   const skyGeo = new THREE.SphereGeometry(400, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
-    uniforms: { top: { value: new THREE.Color(0x24366e) }, mid: { value: new THREE.Color(0xd9825a) }, bottom: { value: new THREE.Color(0x3a2a24) } },
+    uniforms: { top: { value: new THREE.Color(0x3d8bff) }, mid: { value: new THREE.Color(0xffb38a) }, bottom: { value: new THREE.Color(0x7a4a8a) } },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; varying vec3 vP;
       void main(){ float h = vP.y; vec3 c = h > 0.0 ? mix(mid, top, pow(clamp(h*1.6,0.0,1.0), 0.7)) : mix(mid, bottom, clamp(-h*6.0,0.0,1.0));
       gl_FragColor = vec4(c,1.0); }`,
   });
   scene.add(new THREE.Mesh(skyGeo, skyMat));
-  scene.fog = new THREE.Fog(0xb7735a, 45, 140);
+  scene.fog = new THREE.Fog(0xffb995, 60, 170);
 
-  scene.add(new THREE.HemisphereLight(0xffd7b8, 0x3b3029, 0.6));
-  const sun = new THREE.DirectionalLight(0xffe2c4, 2.4);
+  scene.add(new THREE.HemisphereLight(0xfff0e0, 0x8a6a9a, 1.1));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
   sun.position.set(9, 15, 11);
   sun.castShadow = true;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
@@ -44,7 +45,7 @@ export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
     torches.push(l);
   }
   // luz de contorno detrás de los luchadores (la mueve la cámara) para separarlos del fondo
-  const rim = new THREE.DirectionalLight(0x9fb8ff, 2.2);
+  const rim = new THREE.DirectionalLight(0x9fe8ff, 2.0);
   scene.add(rim, rim.target);
   return { torches, rim };
 }
@@ -55,11 +56,11 @@ function tileTexture() {
   c.width = c.height = 512;
   const g = c.getContext('2d');
   const n = 4, sz = 512 / n;
-  g.fillStyle = '#2a2622';
+  g.fillStyle = '#6a4a3a';
   g.fillRect(0, 0, 512, 512);
   for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
-    const v = 120 + Math.random() * 30;
-    g.fillStyle = `rgb(${v + 20},${v + 10},${v - 8})`;
+    const v = 175 + Math.random() * 30;
+    g.fillStyle = `rgb(${v + 30},${v + 12},${v - 20})`;
     g.fillRect(i * sz + 3, j * sz + 3, sz - 6, sz - 6);
     for (let k = 0; k < 140; k++) {
       const a = Math.random() * 0.12;
@@ -108,8 +109,11 @@ export async function loadArena(scene, base = 'assets/') {
     o.castShadow = !/Agua|Suelo|Grada_|Muro/.test(o.name);
     if (/Agua/.test(o.name)) water = o;
     if (o.material && o.material.name === 'M_Fuego') {
-      o.material = new THREE.MeshBasicMaterial({ color: 0xffa040 });
+      o.material = new THREE.MeshBasicMaterial({ color: 0xffb040 });
       o.userData.fire = true;
+    } else if (o.material && o.material.isMeshStandardMaterial && !/Agua/.test(o.name)) {
+      const m = o.material;
+      o.material = toonMat(vivid(m.color, 0.2, 0.1), { map: m.map || null });
     }
   });
   scene.add(root);
@@ -119,7 +123,7 @@ export async function loadArena(scene, base = 'assets/') {
   tiles.repeat.set(9.4 / 4, 9.4 / 4);
   const top = new THREE.Mesh(
     new THREE.PlaneGeometry(9.4, 9.4),
-    new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
+    new THREE.MeshToonMaterial({ map: tiles, gradientMap, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
   );
   top.rotation.x = -Math.PI / 2;
   top.position.y = RING_TOP + 0.0008;
@@ -131,7 +135,7 @@ export async function loadArena(scene, base = 'assets/') {
   if (water) {
     waterTex = waterNormal();
     water.material = new THREE.MeshStandardMaterial({
-      color: 0x0d3446, roughness: 0.12, metalness: 0.2, normalMap: waterTex, normalScale: new THREE.Vector2(0.35, 0.35),
+      color: 0x18a8c8, roughness: 0.1, metalness: 0.1, normalMap: waterTex, normalScale: new THREE.Vector2(0.35, 0.35),
       transparent: true, opacity: 0.93,
     });
   }
@@ -141,7 +145,7 @@ export async function loadArena(scene, base = 'assets/') {
 }
 
 // ---------------------------------------------------------------- público
-const CLOTHES = [0xb3141a, 0x1d3f9a, 0xe6bf1a, 0x1f7a33, 0xe8e6dc, 0x1a1a1a, 0x7c1c86, 0xf06a10, 0x2aa0b4, 0x5a3b22, 0xd94f8a, 0x8fbf3a];
+const CLOTHES = [0xff3b3b, 0x2f7bff, 0xffd21f, 0x2ecc5a, 0xffffff, 0x2a2a3a, 0xb04fff, 0xff8a1f, 0x1fd0e0, 0xff5fa8, 0x9be22f, 0x6a5aff];
 const SKIN = [0xf2c4a0, 0xd9a07a, 0xa8714a, 0x7a4a2c, 0x4a2c1a];
 
 export async function loadCrowd(scene, base = 'assets/', density = 1) {
@@ -153,7 +157,7 @@ export async function loadCrowd(scene, base = 'assets/', density = 1) {
   const a1 = new THREE.BoxGeometry(0.08, 0.5, 0.08); a1.rotateZ(-0.3); a1.translate(0.27, 0.95, 0);
   const a2 = new THREE.BoxGeometry(0.08, 0.5, 0.08); a2.rotateZ(0.3); a2.translate(-0.27, 0.95, 0);
   const arms = mergeGeometries([a1, a2]);
-  const mat = new THREE.MeshLambertMaterial();
+  const mat = toonMat(0xffffff);
   const mBody = new THREE.InstancedMesh(body, mat, N);
   const mHead = new THREE.InstancedMesh(head, mat, N);
   const mArms = new THREE.InstancedMesh(arms, mat, N);
