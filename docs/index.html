@@ -95,6 +95,30 @@
     </div>
   </div>
 
+  <div id="select" class="hidden">
+    <h2 class="sel-title">ELIGE TU LUCHADOR</h2>
+    <div class="sel-info p1">
+      <div class="who">J1</div>
+      <div class="nm"></div>
+      <div class="tt"></div>
+      <div class="stats"></div>
+      <div class="state"></div>
+    </div>
+    <div class="sel-info p2">
+      <div class="who">J2</div>
+      <div class="nm"></div>
+      <div class="tt"></div>
+      <div class="stats"></div>
+      <div class="state"></div>
+    </div>
+    <div class="sel-bottom">
+      <div id="grid"></div>
+      <p class="sel-help desk">J1: <kbd>A</kbd><kbd>D</kbd><kbd>W</kbd><kbd>S</kbd> elegir · <kbd>F</kbd> confirmar · <kbd>G</kbd> cambiar &nbsp;|&nbsp; J2: flechas · <kbd>K</kbd> confirmar · <kbd>L</kbd> cambiar</p>
+      <p class="sel-help mob">Toca un luchador y vuelve a tocarlo para confirmar</p>
+    </div>
+    <button class="toMenu sel-back ghost">Volver</button>
+  </div>
+
   <div id="online" class="overlay hidden">
     <div class="panel small">
       <h2>ONLINE</h2>
@@ -133,6 +157,7 @@
       <h2 id="endTitle"></h2>
       <div class="buttons">
         <button id="rematch" class="primary">Revancha</button>
+        <button id="reselect">Elegir luchador</button>
         <button class="toMenu">Menú principal</button>
       </div>
       <p id="endStatus" class="status"></p>

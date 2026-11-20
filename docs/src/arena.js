@@ -1,10 +1,18 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RING_TOP } from './fighter.js';
 
 // ---------------------------------------------------------------- cielo y luces
-export function setupEnvironment(scene, shadowSize = 2048) {
+export function setupEnvironment(scene, shadowSize = 2048, renderer = null) {
+  // reflejos suaves para metales y piel
+  if (renderer) {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.35;
+    pmrem.dispose();
+  }
   const skyGeo = new THREE.SphereGeometry(400, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
@@ -17,7 +25,7 @@ export function setupEnvironment(scene, shadowSize = 2048) {
   scene.add(new THREE.Mesh(skyGeo, skyMat));
   scene.fog = new THREE.Fog(0xb7735a, 45, 140);
 
-  scene.add(new THREE.HemisphereLight(0xffd7b8, 0x3b3029, 0.9));
+  scene.add(new THREE.HemisphereLight(0xffd7b8, 0x3b3029, 0.6));
   const sun = new THREE.DirectionalLight(0xffe2c4, 2.4);
   sun.position.set(9, 15, 11);
   sun.castShadow = true;
@@ -35,7 +43,10 @@ export function setupEnvironment(scene, shadowSize = 2048) {
     scene.add(l);
     torches.push(l);
   }
-  return { torches };
+  // luz de contorno detrás de los luchadores (la mueve la cámara) para separarlos del fondo
+  const rim = new THREE.DirectionalLight(0x9fb8ff, 2.2);
+  scene.add(rim, rim.target);
+  return { torches, rim };
 }
 
 // ---------------------------------------------------------------- texturas

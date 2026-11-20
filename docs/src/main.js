@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { Fighter, MAX_HP, RING_TOP } from './fighter.js';
 import { Input, RemoteInput, toFighterInput, NO_INPUT, toMask, setupTouch } from './input.js';
-import { ATTACKS } from './poses.js';
+import { ATTACKS, STANCE, over } from './poses.js';
+import { ROSTER } from './characters.js';
 import { Sfx } from './audio.js';
 import { AI } from './ai.js';
 import { Net, cleanCode } from './net.js';
@@ -35,17 +36,14 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
-const env = setupEnvironment(scene, TOUCH ? 1024 : 2048);
+const env = setupEnvironment(scene, TOUCH ? 1024 : 2048, renderer);
 const fx = new FX(scene);
 const sfx = new Sfx();
 const input = new Input();
 const remote = new RemoteInput();
 const net = new Net();
 
-const fighters = [
-  new Fighter(scene, { name: 'KAITO', gi: 0xb8231c, pants: 0xa21e18, belt: 0x161616, skin: 0xe0ac84, hair: 0x1a1410, glove: 0x2a2a2a, shoe: 0x1c1c1c, hairStyle: 'spiky' }, 0),
-  new Fighter(scene, { name: 'RINA', gi: 0x2a5fd0, pants: 0x1c2f6e, belt: 0xf0f0f0, skin: 0xf1c7a6, hair: 0x5a2e14, glove: 0xf0f0f0, shoe: 0xf0f0f0, hairStyle: 'ponytail' }, 1),
-];
+const fighters = [new Fighter(scene, ROSTER[0], 0), new Fighter(scene, ROSTER[1], 1)];
 fighters.forEach((f) => scene.add(f.blob));
 
 // ---------------------------------------------------------------- HUD
@@ -179,8 +177,8 @@ function resetRound() {
 
 function setNames() {
   const you = G.mode === 'online' ? (net.role === 'host' ? 0 : 1) : -1;
-  $('.p1 .name').textContent = 'KAITO' + (you === 0 ? ' (TÚ)' : '');
-  $('.p2 .name').textContent = 'RINA' + (G.mode === 'cpu' ? ' (CPU)' : you === 1 ? ' (TÚ)' : '');
+  $('.p1 .name').textContent = fighters[0].name + (you === 0 ? ' (TÚ)' : '');
+  $('.p2 .name').textContent = fighters[1].name + (G.mode === 'cpu' ? ' (CPU)' : you === 1 ? ' (TÚ)' : '');
 }
 
 function showFightUi() {
@@ -188,20 +186,28 @@ function showFightUi() {
   pauseEl.classList.add('hidden');
   onlineEl.classList.add('hidden');
   endEl.classList.add('hidden');
+  selectEl.classList.add('hidden');
   hud.classList.remove('hidden');
   touchEl.classList.toggle('hidden', !TOUCH || G.mode === '2p');
   $('#btnPause').classList.toggle('hidden', G.mode === 'online');
   setNames();
 }
 
-function startMatch(mode) {
+function startMatch(mode) { openSelect(mode); }
+
+function applyPicks(picks) {
+  fighters[0].setCharacter(ROSTER[picks[0]], false);
+  fighters[1].setCharacter(ROSTER[picks[1]], picks[0] === picks[1]); // mismo luchador: colores alternativos
+}
+
+function beginMatch() {
   sfx.init();
-  G.mode = mode;
-  G.ai = mode === 'cpu' ? new AI() : null;
+  G.ai = G.mode === 'cpu' ? new AI() : null;
+  applyPicks(sel.cur);
   fighters.forEach((f) => { f.wins = 0; });
   G.round = 0;
   showFightUi();
-  if (isHost()) outbox.push(['start']);
+  if (isHost()) outbox.push(['start', sel.cur.slice()]);
   startRound();
 }
 
@@ -317,7 +323,12 @@ function playEvent(e) {
   else if (k === 'f') { const fn = fx[e[1]]; if (fn) fn.apply(fx, e[2].map(des)); }
   else if (k === 'a') announce(e[1], e[2], e[3], e[4]);
   else if (k === 'p') pop(e[1], e[2]);
-  else if (k === 'start') { fighters.forEach((f) => f.reset(f.index ? 1.5 : -1.5, f.index ? -Math.PI / 2 : Math.PI / 2)); G.camN.set(0, 0, 1); showFightUi(); }
+  else if (k === 'start') {
+    if (e[1]) { sel.cur = e[1].slice(); applyPicks(sel.cur); }
+    fighters.forEach((f) => f.reset(f.index ? 1.5 : -1.5, f.index ? -Math.PI / 2 : Math.PI / 2));
+    G.camN.set(0, 0, 1);
+    showFightUi();
+  }
   else if (k === 'end') showEndPanel(e[1]);
 }
 
@@ -333,15 +344,22 @@ net.on('data', (d) => {
   if (!d || !d.t) return;
   if (net.role === 'host') {
     if (d.t === 'i') remote.receive(d.h, d.p);
-    else if (d.t === 'rematch' && G.phase === 'matchEnd') startMatch('online');
+    else if (d.t === 'rematch' && G.phase === 'matchEnd') beginMatch();
+    else if (d.t === 'reselect' && G.phase === 'matchEnd') { openSelect('online'); net.send({ t: 'toSelect' }); }
+    else if (d.t === 'sel') applyRemoteSel(d);
   } else if (d.t === 's') {
     applySnapshot(d);
+  } else if (d.t === 'toSelect') {
+    openSelect('online');
+  } else if (d.t === 'sel') {
+    applyRemoteSel(d);
   }
 });
 net.on('connected', () => {
   if (net.role === 'host') {
     setOnlineStatus('¡Rival conectado!');
-    startMatch('online');
+    openSelect('online');
+    net.send({ t: 'toSelect' });
   } else {
     setOnlineStatus('Conectado. Esperando al anfitrión…');
     G.mode = 'online';
@@ -381,7 +399,10 @@ function updateCamera(dt, snap = false) {
     G.camN.lerp(n, 1 - Math.pow(0.94, dt * 60)).normalize();
   }
   let pos, look;
-  if (inMenu) {
+  if (G.phase === 'select') {
+    pos = new THREE.Vector3(0, RING_TOP + 1.45, 3.9);
+    look = new THREE.Vector3(0, RING_TOP + 0.85, 0);
+  } else if (inMenu) {
     const t = performance.now() * 0.00008;
     pos = new THREE.Vector3(Math.sin(t) * 14, 5.5, Math.cos(t) * 14);
     look = new THREE.Vector3(0, 1.5, 0);
@@ -439,6 +460,7 @@ function toMenu() {
   endEl.classList.add('hidden');
   onlineEl.classList.add('hidden');
   touchEl.classList.add('hidden');
+  selectEl.classList.add('hidden');
   menu.classList.remove('hidden');
   announceEl.className = ''; subEl.className = ''; popEl.className = '';
   resetRound();
@@ -514,18 +536,186 @@ $('#btnPause').addEventListener('click', togglePause);
 document.querySelectorAll('.toMenu').forEach((b) => b.addEventListener('click', toMenu));
 function rematch() {
   if (isGuest()) { net.send({ t: 'rematch' }); setEndStatus('Revancha pedida…'); return; }
-  startMatch(G.mode);
+  beginMatch();
 }
+function reselect() {
+  if (isGuest()) { net.send({ t: 'reselect' }); setEndStatus('Esperando al anfitrión…'); return; }
+  openSelect(G.mode);
+  if (isHost()) net.send({ t: 'toSelect' });
+}
+$('#reselect').addEventListener('click', reselect);
 function setEndStatus(t) { $('#endStatus').textContent = t; }
 $('#rematch').addEventListener('click', rematch);
 addEventListener('keydown', (e) => {
   if (e.target && e.target.tagName === 'INPUT') return;
   if (e.code === 'Escape') togglePause();
   if (e.code === 'Enter') {
-    if (G.phase === 'menu' && !menu.classList.contains('hidden')) startMatch('2p');
+    if (G.phase === 'menu' && !menu.classList.contains('hidden')) startMatch(TOUCH ? 'cpu' : '2p');
     else if (G.phase === 'matchEnd') rematch();
   }
 });
+
+// ---------------------------------------------------------------- selección de luchador
+const selectEl = $('#select'), gridEl = $('#grid');
+const sel = { cur: [0, 1], ok: [false, false], t: 0, cpuT: 0 };
+const COLS = 3;
+const portraits = [];
+
+ROSTER.forEach((d, i) => {
+  const b = document.createElement('button');
+  b.className = 'card';
+  b.dataset.i = i;
+  b.innerHTML = `<div class="ph"></div><span>${d.name}</span><em class="m1">J1</em><em class="m2">J2</em>`;
+  b.addEventListener('click', () => tapCard(i));
+  gridEl.appendChild(b);
+});
+
+// Retratos: cada luchador se renderiza una vez en un lienzo aparte.
+function makePortraits() {
+  const W = 180, H = 216;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: true });
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  const sc = new THREE.Scene();
+  sc.add(new THREE.HemisphereLight(0xffe2c8, 0x2a1c18, 1.1));
+  const key = new THREE.DirectionalLight(0xffe0c0, 2.6); key.position.set(1.5, 2.5, 2); sc.add(key);
+  const rim = new THREE.DirectionalLight(0x8fb0ff, 3); rim.position.set(-1.5, 2, -2); sc.add(rim);
+  const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 20);
+  ROSTER.forEach((d, i) => {
+    const f = new Fighter(sc, d, 0);
+    // pose de retrato: brazos abajo y algo separados para que se vea la cara y el torso
+    const pose = over(STANCE, { hy: -0.15, sy: 0.1, hd: 0.02, lsx: -0.25, lsz: 0.28, lex: -0.9, rsx: -0.25, rsz: -0.28, rex: -0.9 });
+    f.pose = pose; f.applyPose(pose);
+    f.root.rotation.y = -0.35;
+    const s = d.build.scale;
+    cam.position.set(0.25, 1.55 * s, 1.75 * s);
+    cam.lookAt(0, 1.4 * s, 0);
+    r.render(sc, cam);
+    portraits[i] = cv.toDataURL('image/png');
+    sc.remove(f.root);
+  });
+  r.dispose();
+  r.forceContextLoss();
+  gridEl.querySelectorAll('.card .ph').forEach((el, i) => { el.style.backgroundImage = `url(${portraits[i]})`; });
+}
+
+// Qué ranuras controla este dispositivo, y con qué jugador del teclado.
+function localSlots() {
+  if (G.mode === 'online') return net.role === 'host' ? [[0, 0]] : [[1, 0]];
+  if (G.mode === 'cpu') return [[0, 0]];
+  return [[0, 0], [1, 1]];
+}
+
+function openSelect(mode) {
+  sfx.init();
+  G.mode = mode;
+  G.phase = 'select';
+  sel.ok = [false, false]; sel.t = 0; sel.cpuT = 0;
+  menu.classList.add('hidden'); onlineEl.classList.add('hidden'); endEl.classList.add('hidden');
+  pauseEl.classList.add('hidden'); hud.classList.add('hidden'); touchEl.classList.add('hidden');
+  announceEl.className = ''; subEl.className = ''; popEl.className = '';
+  selectEl.classList.remove('hidden');
+  resetRound();
+  fighters[0].reset(-1.1, Math.PI / 2 - 0.5);
+  fighters[1].reset(1.1, -Math.PI / 2 + 0.5);
+  G.camN.set(0, 0, 1);
+  renderSelect();
+}
+
+function moveCursor(slot, d) {
+  const n = ROSTER.length;
+  let c = sel.cur[slot];
+  if (d === 'left') c = (c - 1 + n) % n;
+  if (d === 'right') c = (c + 1) % n;
+  if (d === 'up') c = (c - COLS + n) % n;
+  if (d === 'down') c = (c + COLS) % n;
+  setCursor(slot, c);
+}
+function setCursor(slot, c) {
+  if (sel.ok[slot] || sel.cur[slot] === c) return;
+  sel.cur[slot] = c;
+  nsfx.step();
+  syncSel(slot);
+}
+function confirmPick(slot, ok) {
+  if (sel.ok[slot] === ok) return;
+  sel.ok[slot] = ok;
+  if (ok) nsfx.hit(false); else nsfx.block();
+  syncSel(slot);
+}
+function syncSel(slot) {
+  if (G.mode === 'online') net.send({ t: 'sel', s: slot, c: sel.cur[slot], ok: sel.ok[slot] });
+  renderSelect();
+}
+function applyRemoteSel(d) {
+  if (G.phase !== 'select') return;
+  sel.cur[d.s] = d.c;
+  sel.ok[d.s] = d.ok;
+  renderSelect();
+}
+
+function tapCard(i) {
+  if (G.phase !== 'select') return;
+  const slots = localSlots().map(([s]) => s);
+  const slot = slots.find((s) => !sel.ok[s]);
+  if (slot === undefined) return;
+  if (sel.cur[slot] === i) confirmPick(slot, true); // segundo toque: confirmar
+  else { sel.cur[slot] = i; nsfx.step(); syncSel(slot); }
+}
+
+function selectStep() {
+  input.poll();
+  for (const [slot, pi] of localSlots()) {
+    const p = input.players[pi].pressed;
+    if (!sel.ok[slot]) {
+      for (const d of ['left', 'right', 'up', 'down']) if (p[d]) moveCursor(slot, d);
+      if (p.punch) confirmPick(slot, true);
+    } else if (p.kick || p.guard) confirmPick(slot, false);
+  }
+  if (G.mode === 'cpu' && sel.ok[0] && !sel.ok[1]) {
+    // la CPU "piensa" moviendo el cursor y elige uno al azar
+    sel.cpuT++;
+    if (sel.cpuT % 8 === 0) { sel.cur[1] = (sel.cur[1] + 1) % ROSTER.length; renderSelect(); }
+    if (sel.cpuT > 50) { sel.cur[1] = (Math.random() * ROSTER.length) | 0; confirmPick(1, true); }
+  }
+  if (sel.ok[0] && sel.ok[1]) {
+    if (++sel.t > 55 && !isGuest()) beginMatch();
+  } else sel.t = 0;
+}
+
+const pct = (v, lo, hi) => Math.round(Math.max(0.08, Math.min(1, (v - lo) / (hi - lo))) * 100);
+function statsHtml(d) {
+  const row = (label, v) => `<div class="st"><span>${label}</span><b><i style="width:${v}%"></i></b></div>`;
+  return row('Poder', pct(d.stats.power, 0.75, 1.3)) + row('Velocidad', pct(d.stats.speed, 0.75, 1.25)) + row('Peso', pct(d.stats.weight, 0.75, 1.4));
+}
+function renderSelect() {
+  applyPicks(sel.cur);
+  fighters.forEach((f, i) => {
+    const want = sel.ok[i] ? 'victory' : 'idle';
+    if (f.state !== want) f.setState(want);
+  });
+  const mine = localSlots().map(([s]) => s);
+  [0, 1].forEach((i) => {
+    const d = ROSTER[sel.cur[i]];
+    const box = selectEl.querySelector(`.sel-info.p${i + 1}`);
+    box.querySelector('.nm').textContent = d.name;
+    box.querySelector('.tt').textContent = `${d.title} · ${d.origin}`;
+    box.querySelector('.stats').innerHTML = statsHtml(d);
+    let who = i === 0 ? 'J1' : (G.mode === 'cpu' ? 'CPU' : 'J2');
+    if (G.mode === 'online') who = mine.includes(i) ? 'TÚ' : 'RIVAL';
+    box.querySelector('.who').textContent = who;
+    box.querySelector('.state').textContent = sel.ok[i] ? '¡LISTO!' : (mine.includes(i) ? (TOUCH ? 'Toca otra vez para confirmar' : 'Elige y confirma') : 'Eligiendo…');
+    box.classList.toggle('ready', sel.ok[i]);
+  });
+  gridEl.querySelectorAll('.card').forEach((c, i) => {
+    c.classList.toggle('c1', sel.cur[0] === i);
+    c.classList.toggle('c2', sel.cur[1] === i);
+    c.classList.toggle('lock1', sel.cur[0] === i && sel.ok[0]);
+    c.classList.toggle('lock2', sel.cur[1] === i && sel.ok[1]);
+  });
+}
 
 // ---------------------------------------------------------------- bucle
 let arena = null;
@@ -534,7 +724,10 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  if (isGuest()) {
+  if (G.phase === 'select') {
+    acc += dt;
+    while (acc >= STEP) { acc -= STEP; selectStep(); }
+  } else if (isGuest()) {
     guestAcc += dt;
     while (guestAcc >= STEP) { guestAcc -= STEP; guestStep(); }
   } else if (!['paused', 'menu', 'loading', 'matchEnd'].includes(G.phase)) {
@@ -556,6 +749,8 @@ function frame(now) {
   fighters.forEach((f) => f.render(paused ? 0 : dt));
   fx.update(paused ? 0 : dt);
   updateCamera(dt);
+  env.rim.position.copy(camLook).addScaledVector(G.camN, -9).add(new THREE.Vector3(0, 5, 0));
+  env.rim.target.position.copy(camLook);
   updateHud();
   renderer.render(scene, camera);
 }
@@ -564,6 +759,7 @@ function frame(now) {
   try {
     arena = await loadArena(scene);
     G.crowd = await loadCrowd(scene, 'assets/', TOUCH ? 0.6 : 1);
+    makePortraits();
   } catch (err) {
     console.error(err);
     $('#loading').textContent = 'No se pudo cargar la arena. Abre el juego desde un servidor web (ver README).';
@@ -589,6 +785,6 @@ requestAnimationFrame(frame);
 
 // para depurar desde la consola
 window.__game = {
-  G, fighters, startMatch, input, net,
+  G, fighters, startMatch, beginMatch, sel: () => sel, input, net,
   advance(n = 1) { for (let i = 0; i < n; i++) { step(); fighters.forEach((f) => f.render(STEP)); fx.update(STEP); } },
 };

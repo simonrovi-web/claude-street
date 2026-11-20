@@ -5,6 +5,7 @@ import {
   HIT_HIGH, HIT_MID, HIT_CROUCH, BLOCK, BLOCK_CROUCH, KNOCK, VICTORY,
   ATTACKS, THROW_KEYS,
 } from './poses.js';
+import { buildModel } from './characters.js';
 
 export const RING_TOP = 0.8;     // altura de la superficie del ring
 export const RING_HALF = 5.0;    // medio lado del ring (10 x 10 m)
@@ -21,117 +22,39 @@ const KNOCKBACK = new Set(['hitstun', 'blockstun', 'knockdown', 'ko']);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class Fighter {
-  constructor(scene, cfg, index) {
-    this.cfg = cfg;
+  constructor(scene, def, index) {
+    this.scene = scene;
     this.index = index;
-    this.name = cfg.name;
-    this.mats = [];
-    this.build(cfg);
-    scene.add(this.root);
+    // sombra de contacto (siempre visible, ayuda a leer la profundidad)
+    this.blob = new THREE.Mesh(
+      new THREE.CircleGeometry(0.45, 24),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
+    );
+    this.blob.rotation.x = -Math.PI / 2;
     this.pos = new THREE.Vector3();
     this.vel = new THREE.Vector3();
     this.time = index * 37;
     this.wins = 0;
+    this.setCharacter(def, false);
     this.reset(0, 0);
   }
 
   // ------------------------------------------------------------ modelo
-  build(c) {
-    const mat = (color, rough = 0.7) => {
-      const m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
-      this.mats.push(m);
-      return m;
-    };
-    const gi = mat(c.gi), pants = mat(c.pants), skin = mat(c.skin, 0.55), hair = mat(c.hair, 0.6),
-      belt = mat(c.belt, 0.5), glove = mat(c.glove, 0.4), shoe = mat(c.shoe, 0.6);
-
-    const part = (geo, m, parent, x = 0, y = 0, z = 0) => {
-      const mesh = new THREE.Mesh(geo, m);
-      mesh.position.set(x, y, z);
-      mesh.castShadow = true;
-      parent.add(mesh);
-      return mesh;
-    };
-    const joint = (parent, x = 0, y = 0, z = 0) => {
-      const g = new THREE.Group();
-      g.position.set(x, y, z);
-      parent.add(g);
-      return g;
-    };
-    const cap = (r, len) => new THREE.CapsuleGeometry(r, len, 4, 10);
-
-    this.root = new THREE.Group();
-    this.tilt = joint(this.root);
-    const hips = this.hips = joint(this.tilt, 0, 0.99, 0);
-    part(new THREE.BoxGeometry(0.34, 0.2, 0.22), pants, hips, 0, -0.02, 0);
-    const spine = this.spine = joint(hips, 0, 0.08, 0);
-    // torso (gi) más ancho arriba
-    const torsoGeo = new THREE.CylinderGeometry(0.22, 0.17, 0.52, 10);
-    torsoGeo.scale(1, 1, 0.62);
-    part(torsoGeo, gi, spine, 0, 0.26, 0);
-    part(new THREE.BoxGeometry(0.36, 0.06, 0.24), belt, spine, 0, 0.02, 0);
-    // escote (piel)
-    const v = part(new THREE.BoxGeometry(0.1, 0.14, 0.02), skin, spine, 0, 0.44, 0.12);
-    v.rotation.x = -0.15;
-    const neck = joint(spine, 0, 0.52, 0);
-    part(cap(0.055, 0.06), skin, neck, 0, 0.04, 0);
-    const head = this.head = joint(neck, 0, 0.1, 0);
-    const headGeo = new THREE.SphereGeometry(0.125, 16, 12);
-    headGeo.scale(0.92, 1.08, 1);
-    part(headGeo, skin, head, 0, 0.07, 0.01);
-    // pelo
-    if (c.hairStyle === 'ponytail') {
-      const h = new THREE.SphereGeometry(0.132, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55);
-      part(h, hair, head, 0, 0.085, -0.005);
-      const tail = part(cap(0.045, 0.22), hair, head, 0, 0.05, -0.16);
-      tail.rotation.x = 0.5;
-      part(new THREE.SphereGeometry(0.05, 8, 6), hair, head, 0, 0.15, -0.11);
-    } else {
-      const h = new THREE.SphereGeometry(0.135, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
-      part(h, hair, head, 0, 0.09, -0.01);
-      for (let i = 0; i < 6; i++) {
-        const sp = part(new THREE.ConeGeometry(0.045, 0.14, 5), hair, head, (i - 2.5) * 0.04, 0.19, -0.04 - Math.abs(i - 2.5) * 0.01);
-        sp.rotation.set(-0.5, 0, (i - 2.5) * -0.25);
-      }
-      // cinta en la frente
-      part(new THREE.TorusGeometry(0.128, 0.018, 6, 20), belt, head, 0, 0.11, 0.0).rotation.x = Math.PI / 2 + 0.15;
+  setCharacter(def, alt = false) {
+    if (this.def === def && this.alt === alt) return;
+    if (this.root) {
+      this.scene.remove(this.root);
+      this.root.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
+      this.mats.forEach((m) => m.dispose());
     }
-    // ojos
-    const eye = new THREE.MeshBasicMaterial({ color: 0x111111 });
-    part(new THREE.SphereGeometry(0.014, 6, 4), eye, head, 0.045, 0.085, 0.115);
-    part(new THREE.SphereGeometry(0.014, 6, 4), eye, head, -0.045, 0.085, 0.115);
-
-    // brazos
-    const arm = (side) => {
-      const sh = joint(spine, side * 0.25, 0.46, 0);
-      part(new THREE.SphereGeometry(0.075, 10, 8), gi, sh);
-      part(cap(0.062, 0.2), gi, sh, 0, -0.14, 0);
-      const el = joint(sh, 0, -0.29, 0);
-      part(cap(0.05, 0.18), skin, el, 0, -0.12, 0);
-      part(new THREE.SphereGeometry(0.07, 10, 8), glove, el, 0, -0.27, 0);
-      return [sh, el];
-    };
-    [this.lSh, this.lEl] = arm(1);
-    [this.rSh, this.rEl] = arm(-1);
-    // piernas
-    const leg = (side) => {
-      const hp = joint(hips, side * 0.1, -0.05, 0);
-      part(cap(0.08, 0.3), pants, hp, 0, -0.22, 0);
-      const kn = joint(hp, 0, -0.45, 0);
-      part(cap(0.068, 0.3), pants, kn, 0, -0.21, 0);
-      part(new THREE.BoxGeometry(0.11, 0.08, 0.24), shoe, kn, 0, -0.45, 0.05);
-      return [hp, kn];
-    };
-    [this.lHip, this.lKn] = leg(1);
-    [this.rHip, this.rKn] = leg(-1);
-
-    // sombra de contacto (siempre visible, ayuda a leer la profundidad)
-    const blob = new THREE.Mesh(
-      new THREE.CircleGeometry(0.45, 24),
-      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
-    );
-    blob.rotation.x = -Math.PI / 2;
-    this.blob = blob;
+    this.def = def;
+    this.alt = alt;
+    this.name = def.name;
+    this.stats = def.stats;
+    Object.assign(this, buildModel(def, alt));
+    this.root.scale.setScalar(def.build.scale);
+    this.scene.add(this.root);
+    if (this.pose) this.applyPose(this.pose);
   }
 
   applyPose(p) {
@@ -270,29 +193,30 @@ export class Fighter {
       G.onBlock(this, opp, A);
     } else {
       const counter = opp.state === 'attack' && opp.f <= opp.attack.s;
-      opp.takeHit(A, f, counter, G);
+      opp.takeHit(A, f, counter, G, this);
       G.onHit(this, opp, A, counter);
     }
   }
 
-  takeHit(A, dir, counter, G) {
-    const dmg = Math.round(A.dmg * (counter ? 1.25 : 1));
+  takeHit(A, dir, counter, G, att) {
+    const dmg = Math.round(A.dmg * (att ? att.stats.power : 1) * (counter ? 1.25 : 1));
+    const push = A.push / this.stats.weight;
     const wasCrouching = this.isCrouching();
     this.hp = Math.max(0, this.hp - dmg);
     this.flash = 7;
     this.attack = null;
     if (this.hp <= 0) {
       this.dead = true;
-      this.knockdown(dir, A.push + 0.06, 0.1);
+      this.knockdown(dir, push + 0.06, 0.1);
       G.onKO(this);
     } else if (A.knockdown || this.isAirborne()) {
-      this.knockdown(dir, A.push, 0.08);
+      this.knockdown(dir, push, 0.08);
     } else {
       this.hitLevel = wasCrouching ? 'crouch' : A.level;
       this.stun = A.hs + (counter ? 4 : 0);
       this.setState('hitstun');
-      this.vel.x = dir.x * A.push;
-      this.vel.z = dir.z * A.push;
+      this.vel.x = dir.x * push;
+      this.vel.z = dir.z * push;
     }
   }
 
@@ -300,8 +224,8 @@ export class Fighter {
     this.blockCrouch = this.isCrouching();
     this.stun = A.bs;
     this.setState('blockstun');
-    this.vel.x = dir.x * A.push * 0.6;
-    this.vel.z = dir.z * A.push * 0.6;
+    this.vel.x = dir.x * A.push * 0.6 / this.stats.weight;
+    this.vel.z = dir.z * A.push * 0.6 / this.stats.weight;
   }
 
   knockdown(dir, push, pop) {
@@ -338,7 +262,7 @@ export class Fighter {
         else if (held.fwd || held.back) {
           st = 'walk';
           const f = this.fwd();
-          const sp = held.fwd ? WALK_F : -WALK_B;
+          const sp = (held.fwd ? WALK_F : -WALK_B) * this.stats.speed;
           this.walkDir = held.fwd ? 1 : -1;
           this.pos.x += f.x * sp;
           this.pos.z += f.z * sp;
@@ -356,7 +280,7 @@ export class Fighter {
           break;
         case 'land': if (this.f >= 7) this.toIdle(); break;
         case 'sidestep': {
-          const k = Math.max(0, 1 - this.f / 14) * 0.085;
+          const k = Math.max(0, 1 - this.f / 14) * 0.085 * Math.sqrt(this.stats.speed);
           this.pos.addScaledVector(this.sideVec, k);
           this.turnTo(opp, 0.15);
           if (this.f >= 16) this.toIdle();
@@ -415,7 +339,7 @@ export class Fighter {
     this.vel.set(0, 0, 0);
     if (t >= 1) {
       const dir = new THREE.Vector3().subVectors(this.throwTo, this.throwFrom).setY(0).normalize();
-      this.hp = Math.max(0, this.hp - 30);
+      this.hp = Math.max(0, this.hp - Math.round(30 * this.thrower.stats.power));
       this.flash = 7;
       this.knockdown(dir, 0.06, 0.02);
       G.onThrowLand(this.thrower, this);
@@ -547,6 +471,12 @@ export class Fighter {
     const a = 1 - Math.pow(1 - k, dt * 60);
     for (const key of KEYS) this.pose[key] += (target[key] - this.pose[key]) * a;
     this.applyPose(this.pose);
+    for (const c of this.cloth) {
+      const p = this.pose;
+      c.pivot.rotation.x = c.side > 0
+        ? Math.min(0, Math.min(p.lhx, p.rhx)) * 0.75 - 0.04
+        : Math.max(0, Math.max(p.lhx, p.rhx)) * 0.75 + 0.04;
+    }
     this.root.position.copy(this.pos);
     this.root.rotation.y = this.facing;
     const e = this.flash > 0 ? 0.9 * (this.flash / 7) : 0;

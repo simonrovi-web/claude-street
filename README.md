@@ -6,6 +6,23 @@ La arena (ring, estanque, antorchas, gradas y público) está modelada en Blende
 
 **Jugar:** https://simonrovi-web.github.io/claude-street/
 
+## Luchadores
+
+Antes de cada combate se elige luchador. Si los dos eligen el mismo, el segundo sale con colores alternativos.
+
+| Luchador | Estilo | Poder | Velocidad | Peso |
+|---|---|---|---|---|
+| **Kaito**, el Puño Carmesí | Karate tradicional | Medio | Media | Medio |
+| **Rina**, Tormenta Azul | Kickboxing callejero | Bajo | Alta | Bajo |
+| **Voss**, el Martillo de Hierro | Gladiador acorazado | Muy alto | Baja | Muy alto |
+| **Nyx**, Sombra sin Rostro | Asesina encapuchada | Medio | Muy alta | Bajo |
+| **Torak**, Furia de las Montañas | Guerrero tribal | Alto | Media | Alto |
+| **Sera**, Loto Dorado | Monja guerrera | Medio | Alta | Medio |
+
+*Poder* multiplica el daño, *Velocidad* la rapidez al moverse y esquivar, y *Peso* reduce cuánto te empujan los golpes (más difícil sacarte del ring).
+
+Selección: J1 con `A` `D` `W` `S` y `F` para confirmar (`G` para cambiar); J2 con las flechas y `K` (`L` para cambiar). Con ratón o pantalla táctil, toca un luchador y vuelve a tocarlo para confirmar.
+
 ## Jugar con dos móviles
 
 1. Los dos abrís el enlace de arriba en el navegador del móvil y lo ponéis en horizontal.
@@ -65,7 +82,8 @@ docs/                  juego web (publicado con GitHub Pages)
   assets/arena.glb     arena exportada desde Blender
   assets/asientos.json posiciones del público (exportadas del objeto "Publico")
   src/main.js          bucle, rondas, cámara y HUD
-  src/fighter.js       luchador: modelo, estados, física y golpes
+  src/characters.js    plantilla de luchadores y construcción de sus modelos
+  src/fighter.js       luchador: estados, física y golpes
   src/poses.js         poses y tabla de ataques (frames, daño, alcance)
   src/arena.js         carga de la arena, público, luces y partículas
   src/input.js         teclado, mandos y controles táctiles
